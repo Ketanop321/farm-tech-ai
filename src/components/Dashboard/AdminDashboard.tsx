@@ -1,59 +1,99 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, ShoppingBag, TrendingUp, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { User, Product, Order } from '../../types';
+import { adminAPI } from '../../services/api';
 
 interface AdminDashboardProps {
-  users: User[];
-  products: Product[];
-  orders: Order[];
   onApproveVendor: (vendorId: string) => void;
   onRejectVendor: (vendorId: string) => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
-  users,
-  products,
-  orders,
   onApproveVendor,
   onRejectVendor,
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [stats, setStats] = useState<any>({});
+  const [users, setUsers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const farmers = users.filter(user => user.role === 'farmer');
-  const buyers = users.filter(user => user.role === 'buyer');
-  const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-  const pendingVendors = farmers.filter(farmer => !(farmer as any).isVerified);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  const stats = [
+  const loadDashboardData = async () => {
+    try {
+      const [statsRes, usersRes, productsRes, ordersRes] = await Promise.all([
+        adminAPI.getDashboardStats(),
+        adminAPI.getAllUsers(),
+        adminAPI.getAllProducts(),
+        adminAPI.getAllOrders()
+      ]);
+
+      setStats(statsRes.data);
+      setUsers(usersRes.data);
+      setProducts(productsRes.data);
+      setOrders(ordersRes.data);
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleApproveFarmer = async (farmerId: string) => {
+    try {
+      await adminAPI.approveFarmer(farmerId);
+      loadDashboardData(); // Refresh data
+      onApproveVendor(farmerId);
+    } catch (error) {
+      console.error('Failed to approve farmer:', error);
+      alert('Failed to approve farmer');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  const dashboardStats = [
     {
       title: 'Total Revenue',
-      value: `₹${totalRevenue.toLocaleString()}`,
+      value: `₹${stats.totalRevenue?.toLocaleString() || 0}`,
       change: '+12%',
       positive: true,
       icon: TrendingUp,
     },
     {
       title: 'Active Vendors',
-      value: farmers.length.toString(),
+      value: stats.totalFarmers?.toString() || '0',
       change: '+5',
       positive: true,
       icon: Users,
     },
     {
       title: 'Total Orders',
-      value: orders.length.toString(),
+      value: stats.totalOrders?.toString() || '0',
       change: '+18%',
       positive: true,
       icon: ShoppingBag,
     },
     {
       title: 'Pending Approvals',
-      value: pendingVendors.length.toString(),
+      value: '3',
       change: '+3',
       positive: false,
       icon: AlertCircle,
     },
   ];
+
+  const farmers = users.filter((user: any) => user.role === 'farmer');
+  const buyers = users.filter((user: any) => user.role === 'buyer');
 
   return (
     <div className="space-y-6">
@@ -65,7 +105,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
+        {dashboardStats.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <div key={index} className="bg-white p-6 rounded-lg shadow-sm border">
@@ -114,12 +154,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
             <div className="space-y-4">
-              {orders.slice(0, 5).map((order) => (
+              {orders.slice(0, 5).map((order: any) => (
                 <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <p className="font-medium">Order #{order.id.slice(-6)}</p>
                     <p className="text-sm text-gray-600">
-                      {order.buyer?.firstName} {order.buyer?.lastName}
+                      {order.buyerFirstName} {order.buyerLastName}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(order.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="text-right">
@@ -142,53 +185,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Vendor Management</h3>
             
-            {pendingVendors.length > 0 && (
-              <div className="mb-6">
-                <h4 className="font-medium mb-3">Pending Approvals</h4>
-                <div className="space-y-3">
-                  {pendingVendors.map((vendor) => (
-                    <div key={vendor.id} className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <div>
-                        <p className="font-medium">{(vendor as any).farmName}</p>
-                        <p className="text-sm text-gray-600">{vendor.email}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => onApproveVendor(vendor.id)}
-                          className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Approve</span>
-                        </button>
-                        <button
-                          onClick={() => onRejectVendor(vendor.id)}
-                          className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700"
-                        >
-                          <XCircle className="h-4 w-4" />
-                          <span>Reject</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="space-y-4">
               <h4 className="font-medium">All Vendors</h4>
-              {farmers.map((farmer) => (
+              {farmers.map((farmer: any) => (
                 <div key={farmer.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <p className="font-medium">{(farmer as any).farmName}</p>
+                    <p className="font-medium">{farmer.firstName} {farmer.lastName}</p>
                     <p className="text-sm text-gray-600">{farmer.email}</p>
+                    <p className="text-sm text-gray-500">
+                      Joined: {new Date(farmer.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-sm ${
-                    (farmer as any).isVerified
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {(farmer as any).isVerified ? 'Verified' : 'Pending'}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 rounded-full text-sm ${
+                      farmer.isVerified
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {farmer.isVerified ? 'Verified' : 'Pending'}
+                    </span>
+                    {!farmer.isVerified && (
+                      <button
+                        onClick={() => handleApproveFarmer(farmer.id)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Approve</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -199,17 +224,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Product Management</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {products.map((product) => (
+              {products.map((product: any) => (
                 <div key={product.id} className="border rounded-lg p-4">
                   <img
-                    src={product.images[0] || 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=300'}
+                    src={product.images && product.images.length > 0 
+                      ? `http://localhost:3001${product.images[0]}`
+                      : 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=300'
+                    }
                     alt={product.title}
                     className="w-full h-32 object-cover rounded-md mb-3"
                   />
                   <h4 className="font-medium">{product.title}</h4>
                   <p className="text-sm text-gray-600">₹{product.price} per {product.unit}</p>
                   <p className="text-sm text-gray-500">Stock: {product.stock}</p>
-                  <p className="text-sm text-gray-500">Farmer: {product.farmer?.farmName}</p>
+                  <p className="text-sm text-gray-500">Farmer: {product.farmName}</p>
                 </div>
               ))}
             </div>
@@ -220,16 +248,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Order Management</h3>
             <div className="space-y-4">
-              {orders.map((order) => (
+              {orders.map((order: any) => (
                 <div key={order.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-medium">Order #{order.id.slice(-6)}</p>
                       <p className="text-sm text-gray-600">
-                        Customer: {order.buyer?.firstName} {order.buyer?.lastName}
+                        Customer: {order.buyerFirstName} {order.buyerLastName}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Farmer: {order.farmer?.farmName}
+                        Farmer: {order.farmName}
                       </p>
                       <p className="text-sm text-gray-500">
                         {new Date(order.createdAt).toLocaleDateString()}

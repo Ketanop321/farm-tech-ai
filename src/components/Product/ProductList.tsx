@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
 import { Filter, Grid, List, SortAsc } from 'lucide-react';
 import ProductCard from './ProductCard';
-import { Product } from '../../types';
 
 interface ProductListProps {
-  products: Product[];
+  products: any[];
   onAddToCart: (productId: string) => void;
   onProductClick: (productId: string) => void;
+  onChatWithFarmer?: (farmerId: string, farmerName: string) => void;
+  showEditOptions?: boolean;
 }
 
-const ProductList: React.FC<ProductListProps> = ({ products, onAddToCart, onProductClick }) => {
+const ProductList: React.FC<ProductListProps> = ({ 
+  products, 
+  onAddToCart, 
+  onProductClick,
+  onChatWithFarmer,
+  showEditOptions = false
+}) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('name');
   const [filterBy, setFilterBy] = useState('all');
 
-  const categories = ['all', 'vegetables', 'fruits', 'grains', 'dairy', 'organic'];
+  const categories = ['all', 'vegetables', 'fruits', 'grains', 'dairy', 'herbs'];
 
   const filteredProducts = products.filter(product => {
     if (filterBy === 'all') return true;
@@ -95,6 +102,8 @@ const ProductList: React.FC<ProductListProps> = ({ products, onAddToCart, onProd
             product={product}
             onAddToCart={onAddToCart}
             onProductClick={onProductClick}
+            onChatWithFarmer={onChatWithFarmer}
+            showEditOptions={showEditOptions}
           />
         ))}
       </div>

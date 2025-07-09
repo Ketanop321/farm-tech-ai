@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Layout/Header';
 import Navigation from './components/Layout/Navigation';
 import ProductList from './components/Product/ProductList';
+import AddProductForm from './components/Product/AddProductForm';
 import Cart from './components/Cart/Cart';
 import FarmerDashboard from './components/Dashboard/FarmerDashboard';
 import AdminDashboard from './components/Dashboard/AdminDashboard';
@@ -10,8 +11,8 @@ import AuthProvider from './components/Auth/AuthProvider';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import { useAuth } from './hooks/useAuth';
+import { productsAPI, ordersAPI } from './services/api';
 import { CartItem } from './types';
-import { mockProducts, mockUsers, mockFarmers, mockOrders, mockChatMessages } from './data/mockData';
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
@@ -20,9 +21,40 @@ const AppContent: React.FC = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [chatFarmerId, setChatFarmerId] = useState<string | null>(null);
+  const [chatFarmerName, setChatFarmerName] = useState<string>('');
+
+  useEffect(() => {
+    if (user) {
+      loadProducts();
+      loadOrders();
+    }
+  }, [user]);
+
+  const loadProducts = async () => {
+    try {
+      const response = await productsAPI.getAll();
+      setProducts(response.data);
+    } catch (error) {
+      console.error('Failed to load products:', error);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const response = await ordersAPI.getAll();
+      setOrders(response.data);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+    }
+  };
 
   const handleAddToCart = (productId: string) => {
-    const product = mockProducts.find(p => p.id === productId);
+    const product = products.find((p: any) => p.id === productId);
     if (!product) return;
 
     const existingItem = cartItems.find(item => item.productId === productId);
@@ -57,9 +89,42 @@ const AppContent: React.FC = () => {
     setCartItems(cartItems.filter(item => item.id !== itemId));
   };
 
-  const handleSendMessage = (content: string, type: 'text' | 'image') => {
-    console.log('Sending message:', { content, type });
-    // In a real app, this would send the message via WebSocket
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) return;
+
+    try {
+      const orderData = {
+        items: cartItems.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity
+        })),
+        shippingAddress: {
+          fullName: `${user?.firstName} ${user?.lastName}`,
+          phoneNumber: user?.phone || '',
+          addressLine1: '123 Main St',
+          city: 'City',
+          state: 'State',
+          postalCode: '12345',
+          country: 'India'
+        },
+        paymentMethod: 'credit_card'
+      };
+
+      await ordersAPI.create(orderData);
+      setCartItems([]);
+      setIsCartOpen(false);
+      loadOrders();
+      alert('Order placed successfully!');
+    } catch (error) {
+      console.error('Checkout failed:', error);
+      alert('Failed to place order. Please try again.');
+    }
+  };
+
+  const handleChatWithFarmer = (farmerId: string, farmerName: string) => {
+    setChatFarmerId(farmerId);
+    setChatFarmerName(farmerName);
+    setCurrentPage('chat');
   };
 
   if (!user) {
@@ -90,7 +155,10 @@ const AppContent: React.FC = () => {
                   Discover the finest organic produce directly from local farmers. 
                   Fresh, healthy, and delivered to your doorstep.
                 </p>
-                <button className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                <button 
+                  onClick={() => setCurrentPage('products')}
+                  className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+                >
                   Shop Now
                 </button>
               </div>
@@ -110,9 +178,10 @@ const AppContent: React.FC = () => {
 
             {/* Products */}
             <ProductList
-              products={mockProducts}
+              products={products}
               onAddToCart={handleAddToCart}
               onProductClick={(id) => console.log('Product clicked:', id)}
+              onChatWithFarmer={handleChatWithFarmer}
             />
           </div>
         );
@@ -121,10 +190,14 @@ const AppContent: React.FC = () => {
         if (user.role === 'farmer') {
           return (
             <FarmerDashboard
-              farmer={mockFarmers[0]}
-              products={mockProducts}
-              orders={mockOrders}
-              onAddProduct={() => console.log('Add product')}
+              farmer={user.farmer}
+              products={products.filter((p: any) => p.farmerId === user.farmer?.id)}
+              orders={orders}
+              onAddProduct={() => setIsAddProductOpen(true)}
+              onEditProduct={(product) => {
+                setSelectedProduct(product);
+                setIsAddProductOpen(true);
+              }}
             />
           );
         }
@@ -134,9 +207,6 @@ const AppContent: React.FC = () => {
         if (user.role === 'admin') {
           return (
             <AdminDashboard
-              users={mockUsers}
-              products={mockProducts}
-              orders={mockOrders}
               onApproveVendor={(id) => console.log('Approve vendor:', id)}
               onRejectVendor={(id) => console.log('Reject vendor:', id)}
             />
@@ -145,14 +215,25 @@ const AppContent: React.FC = () => {
         break;
 
       case 'chat':
+        if (chatFarmerId) {
+          return (
+            <div className="max-w-4xl mx-auto">
+              <ChatWindow
+                farmerId={chatFarmerId}
+                farmerName={chatFarmerName}
+                onClose={() => {
+                  setChatFarmerId(null);
+                  setChatFarmerName('');
+                  setCurrentPage('home');
+                }}
+              />
+            </div>
+          );
+        }
         return (
-          <div className="h-96">
-            <ChatWindow
-              messages={mockChatMessages}
-              onSendMessage={handleSendMessage}
-              currentUserId={user.id}
-              otherUserName="Green Acres Farm"
-            />
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold mb-4">Messages</h2>
+            <p className="text-gray-600">Select a farmer to start chatting.</p>
           </div>
         );
 
@@ -163,12 +244,12 @@ const AppContent: React.FC = () => {
               {user.role === 'farmer' ? 'Your Orders' : 'Order History'}
             </h2>
             <div className="space-y-4">
-              {mockOrders.map((order) => (
+              {orders.map((order: any) => (
                 <div key={order.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-medium">Order #{order.id.slice(-6)}</p>
-                      <p className="text-sm text-gray-600">{order.items.length} items</p>
+                      <p className="text-sm text-gray-600">{order.items?.length || 0} items</p>
                       <p className="text-sm text-gray-500">
                         {new Date(order.createdAt).toLocaleDateString()}
                       </p>
@@ -186,6 +267,9 @@ const AppContent: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {orders.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No orders found.</p>
+              )}
             </div>
           </div>
         );
@@ -194,11 +278,25 @@ const AppContent: React.FC = () => {
         if (user.role === 'farmer') {
           return (
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold mb-4">My Products</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">My Products</h2>
+                <button
+                  onClick={() => setIsAddProductOpen(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Add Product
+                </button>
+              </div>
               <ProductList
-                products={mockProducts}
+                products={products.filter((p: any) => p.farmerId === user.farmer?.id)}
                 onAddToCart={handleAddToCart}
-                onProductClick={(id) => console.log('Edit product:', id)}
+                onProductClick={(id) => {
+                  const product = products.find((p: any) => p.id === id);
+                  setSelectedProduct(product);
+                  setIsAddProductOpen(true);
+                }}
+                onChatWithFarmer={handleChatWithFarmer}
+                showEditOptions={true}
               />
             </div>
           );
@@ -237,10 +335,21 @@ const AppContent: React.FC = () => {
         items={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
-        onCheckout={() => {
-          console.log('Checkout with items:', cartItems);
-          setIsCartOpen(false);
+        onCheckout={handleCheckout}
+      />
+
+      <AddProductForm
+        isOpen={isAddProductOpen}
+        onClose={() => {
+          setIsAddProductOpen(false);
+          setSelectedProduct(null);
         }}
+        onProductAdded={() => {
+          loadProducts();
+          setIsAddProductOpen(false);
+          setSelectedProduct(null);
+        }}
+        product={selectedProduct}
       />
     </div>
   );

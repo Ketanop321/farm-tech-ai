@@ -11,16 +11,19 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
     try {
       await login(email, password);
-    } catch (error) {
-      console.error('Login failed:', error);
+    } catch (error: any) {
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -32,6 +35,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
         <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
         <p className="text-gray-600">Sign in to your account</p>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -96,6 +105,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
             Sign up
           </button>
         </p>
+        
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
+          <p className="font-medium text-blue-800 mb-2">Demo Credentials:</p>
+          <p className="text-blue-700">Admin: admin@farmmarket.com / admin123</p>
+          <p className="text-blue-700">Or register as farmer/buyer</p>
+        </div>
       </div>
     </div>
   );

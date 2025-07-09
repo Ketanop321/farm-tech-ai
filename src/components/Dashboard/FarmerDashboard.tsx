@@ -1,40 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TrendingUp, Package, ShoppingBag, MessageCircle, DollarSign, Plus } from 'lucide-react';
-import { Product, Order } from '../../types';
+import { ordersAPI } from '../../services/api';
 
 interface FarmerDashboardProps {
   farmer: any;
-  products: Product[];
-  orders: Order[];
+  products: any[];
+  orders: any[];
   onAddProduct: () => void;
+  onEditProduct: (product: any) => void;
 }
 
 const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ 
   farmer, 
   products, 
   orders, 
-  onAddProduct 
+  onAddProduct,
+  onEditProduct
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
+
+  const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+  const activeProducts = products.filter(p => p.isActive);
+  const thisMonthOrders = orders.filter(order => {
+    const orderDate = new Date(order.createdAt);
+    const now = new Date();
+    return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+  });
 
   const stats = [
     {
       title: 'Total Revenue',
-      value: '₹24,580',
+      value: `₹${totalRevenue.toLocaleString()}`,
       change: '+12%',
       positive: true,
       icon: DollarSign,
     },
     {
       title: 'Active Products',
-      value: products.filter(p => p.isActive).length.toString(),
+      value: activeProducts.length.toString(),
       change: '+3',
       positive: true,
       icon: Package,
     },
     {
       title: 'Orders This Month',
-      value: orders.length.toString(),
+      value: thisMonthOrders.length.toString(),
       change: '+18%',
       positive: true,
       icon: ShoppingBag,
@@ -49,6 +59,17 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
   ];
 
   const recentOrders = orders.slice(0, 5);
+
+  const handleUpdateOrderStatus = async (orderId: string, status: string) => {
+    try {
+      await ordersAPI.updateStatus(orderId, status);
+      // Refresh orders would be handled by parent component
+      window.location.reload(); // Simple refresh for now
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      alert('Failed to update order status');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -122,7 +143,10 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                 <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <p className="font-medium">Order #{order.id.slice(-6)}</p>
-                    <p className="text-sm text-gray-600">{order.items.length} items</p>
+                    <p className="text-sm text-gray-600">{order.items?.length || 0} items</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">₹{order.totalAmount}</p>
@@ -136,26 +160,51 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                   </div>
                 </div>
               ))}
+              {recentOrders.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No recent orders</p>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'products' && (
           <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Your Products</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Your Products</h3>
+              <button
+                onClick={onAddProduct}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Add Product
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {products.map((product) => (
                 <div key={product.id} className="border rounded-lg p-4">
                   <img
-                    src={product.images[0] || 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=300'}
+                    src={product.images && product.images.length > 0 
+                      ? `http://localhost:3001${product.images[0]}`
+                      : 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=300'
+                    }
                     alt={product.title}
                     className="w-full h-32 object-cover rounded-md mb-3"
                   />
                   <h4 className="font-medium">{product.title}</h4>
                   <p className="text-sm text-gray-600">₹{product.price} per {product.unit}</p>
                   <p className="text-sm text-gray-500">Stock: {product.stock}</p>
+                  <button
+                    onClick={() => onEditProduct(product)}
+                    className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                  >
+                    Edit Product
+                  </button>
                 </div>
               ))}
+              {products.length === 0 && (
+                <div className="col-span-full text-center py-8">
+                  <p className="text-gray-500">No products yet. Add your first product!</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -169,24 +218,40 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-medium">Order #{order.id.slice(-6)}</p>
-                      <p className="text-sm text-gray-600">{order.items.length} items</p>
+                      <p className="text-sm text-gray-600">{order.items?.length || 0} items</p>
+                      <p className="text-sm text-gray-500">
+                        Customer: {order.buyerFirstName} {order.buyerLastName}
+                      </p>
                       <p className="text-sm text-gray-500">
                         {new Date(order.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">₹{order.totalAmount}</p>
-                      <span className={`text-sm px-2 py-1 rounded-full ${
-                        order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                        order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {order.status}
-                      </span>
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                        className={`text-sm px-2 py-1 rounded-full border-0 ${
+                          order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                          order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                          order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
                     </div>
                   </div>
                 </div>
               ))}
+              {orders.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No orders yet</p>
+              )}
             </div>
           </div>
         )}
