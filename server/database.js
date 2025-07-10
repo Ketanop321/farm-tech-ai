@@ -1,10 +1,14 @@
-const sqlite3 = require('sqlite3').verbose();
-const bcrypt = require('bcryptjs');
-const path = require('path');
+import sqlite3 from 'sqlite3';
+import bcrypt from 'bcryptjs';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+
+const { verbose } = sqlite3;
+const db = verbose();
 
 class Database {
   constructor() {
-    this.db = new sqlite3.Database('marketplace.db');
+    this.db = new db.Database('marketplace.db');
     this.init();
   }
 
@@ -178,7 +182,7 @@ class Database {
     const adminExists = await this.getUserByEmail('admin@farmmarket.com');
     if (!adminExists) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      const adminId = require('uuid').v4();
+      const adminId = uuidv4();
       
       this.db.run(
         'INSERT INTO users (id, email, password, firstName, lastName, role, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -543,4 +547,4 @@ class Database {
   }
 }
 
-module.exports = Database;
+export default Database;

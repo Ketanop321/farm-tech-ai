@@ -1,7 +1,13 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// ES module equivalents for __dirname and __filename
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -30,8 +36,9 @@ const upload = multer({
   }
 });
 
-module.exports = (db, JWT_SECRET) => {
-  const { authenticateToken } = require('./auth')(db, JWT_SECRET);
+export default (db, JWT_SECRET) => {
+  const authModule = await import('./auth.js');
+  const { authenticateToken } = authModule.default(db, JWT_SECRET);
   const router = express.Router();
 
   // Get all products

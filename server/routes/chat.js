@@ -1,8 +1,9 @@
-const express = require('express');
-const { v4: uuidv4 } = require('uuid');
+import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
 
-module.exports = (db, JWT_SECRET) => {
-  const { authenticateToken } = require('./auth')(db, JWT_SECRET);
+export default (db, JWT_SECRET) => {
+  const authModule = await import('./auth.js');
+  const { authenticateToken } = authModule.default(db, JWT_SECRET);
   const router = express.Router();
 
   // Create or get chat between buyer and farmer

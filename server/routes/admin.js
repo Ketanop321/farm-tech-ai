@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
 
-module.exports = (db, JWT_SECRET) => {
-  const { authenticateToken } = require('./auth')(db, JWT_SECRET);
+export default (db, JWT_SECRET) => {
+  const authModule = await import('./auth.js');
+  const { authenticateToken } = authModule.default(db, JWT_SECRET);
   const router = express.Router();
 
   // Middleware to check admin role
