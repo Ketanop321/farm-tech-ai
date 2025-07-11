@@ -1,13 +1,13 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import authenticateToken from '../middleware/authmiddleware.js';
 
-export default (db, JWT_SECRET) => {
-  const authModule = await import('./auth.js');
-  const { authenticateToken } = authModule.default(db, JWT_SECRET);
+export default async (db, JWT_SECRET) => {
+  const authMiddleware = authenticateToken(JWT_SECRET);
   const router = express.Router();
 
   // Create or get chat between buyer and farmer
-  router.post('/create', authenticateToken, async (req, res) => {
+  router.post('/create', authMiddleware, async (req, res) => {
     try {
       const { farmerId } = req.body;
       const buyerId = req.user.userId;
@@ -33,7 +33,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Get messages for a chat
-  router.get('/:chatId/messages', authenticateToken, async (req, res) => {
+  router.get('/:chatId/messages', authMiddleware, async (req, res) => {
     try {
       const { chatId } = req.params;
       const messages = await db.getMessages(chatId);
@@ -45,7 +45,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Send message
-  router.post('/:chatId/messages', authenticateToken, async (req, res) => {
+  router.post('/:chatId/messages', authMiddleware, async (req, res) => {
     try {
       const { chatId } = req.params;
       const { content, type = 'text' } = req.body;

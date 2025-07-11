@@ -2,9 +2,12 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import authenticateToken from '../middleware/authmiddleware.js';
+
 
 export default (db, JWT_SECRET) => {
   const router = express.Router();
+  const authMiddleware = authenticateToken(JWT_SECRET)
 
   // Register
   router.post('/register', async (req, res) => {
@@ -46,7 +49,6 @@ export default (db, JWT_SECRET) => {
 
       // Generate JWT token
       const token = jwt.sign({ userId, email, role }, JWT_SECRET, { expiresIn: '7d' });
-
       res.status(201).json({
         message: 'User registered successfully',
         token,
@@ -102,26 +104,10 @@ export default (db, JWT_SECRET) => {
     }
   });
 
-  // Verify token middleware
-  const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ error: 'Access token required' });
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-      if (err) {
-        return res.status(403).json({ error: 'Invalid token' });
-      }
-      req.user = user;
-      next();
-    });
-  };
+  
 
   // Get current user
-  router.get('/me', authenticateToken, async (req, res) => {
+  router.get('/me', authMiddleware, async (req, res) => {
     try {
       const user = await db.getUserById(req.user.userId);
       if (!user) {
@@ -147,5 +133,5 @@ export default (db, JWT_SECRET) => {
     }
   });
 
-  return { router, authenticateToken };
+  return router;
 };
