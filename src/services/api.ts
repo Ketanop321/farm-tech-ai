@@ -58,7 +58,10 @@ export const ordersAPI = {
   create: (orderData: any) => api.post('/orders', orderData),
   getAll: () => api.get('/orders'),
   getById: (id: string) => api.get(`/orders/${id}`),
-  updateStatus: (id: string, status: string) => api.patch(`/orders/${id}/status`, { status }),
+  updateStatus: (id: string, status: string) => {
+    console.log('Updating order status:', id, status);
+    return api.patch(`/orders/${id}/status`, { status });
+  },
 };
 
 // Chat API

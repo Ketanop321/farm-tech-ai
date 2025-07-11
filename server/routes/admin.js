@@ -42,7 +42,19 @@ export default async (db, JWT_SECRET) => {
   router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
     try {
       const users = await db.getAllUsers();
-      res.json(users);
+      
+      // Get farmer details for farmer users
+      const usersWithFarmerInfo = await Promise.all(
+        users.map(async (user) => {
+          if (user.role === 'farmer') {
+            const farmer = await db.getFarmerByUserId(user.id);
+            return { ...user, ...farmer };
+          }
+          return user;
+        })
+      );
+      
+      res.json(usersWithFarmerInfo);
     } catch (error) {
       console.error('Get users error:', error);
       res.status(500).json({ error: 'Failed to get users' });

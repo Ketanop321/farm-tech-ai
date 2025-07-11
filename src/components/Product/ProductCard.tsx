@@ -65,7 +65,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
         
         <div className="flex items-center space-x-2 mb-3">
           <MapPin className="h-4 w-4 text-gray-400" />
-          <span className="text-sm text-gray-600">{product.farmName || 'Farm Name'}</span>
+          <span className="text-sm text-gray-600">
+            {product.farmName || `${product.firstName} ${product.lastName}` || 'Farm Name'}
+          </span>
         </div>
         
         <div className="flex items-center justify-between mb-3">

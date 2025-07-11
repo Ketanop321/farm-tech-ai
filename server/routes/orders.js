@@ -94,7 +94,7 @@ export default async(db, JWT_SECRET) => {
   });
 
   // Get user orders
-  router.get('/', authenticateToken, async (req, res) => {
+  router.get('/', authMiddleware, async (req, res) => {
     try {
       const orders = await db.getOrdersByUserId(req.user.userId, req.user.role);
       
@@ -114,7 +114,7 @@ export default async(db, JWT_SECRET) => {
   });
 
   // Update order status (farmers only)
-  router.patch('/:id/status', authenticateToken, async (req, res) => {
+  router.patch('/:id/status', authMiddleware, async (req, res) => {
     try {
       const { status } = req.body;
       const orderId = req.params.id;
@@ -138,7 +138,7 @@ export default async(db, JWT_SECRET) => {
   });
 
   // Get order by ID
-  router.get('/:id', authenticateToken, async (req, res) => {
+  router.get('/:id', authMiddleware, async (req, res) => {
     try {
       const orders = await db.getOrdersByUserId(req.user.userId, req.user.role);
       const order = orders.find(o => o.id === req.params.id);

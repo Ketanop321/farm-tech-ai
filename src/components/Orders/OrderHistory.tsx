@@ -112,12 +112,12 @@ const OrderHistory: React.FC = () => {
                   {order.items?.map((item: any) => (
                     <div key={item.id} className="flex items-center space-x-4 p-3 border rounded-lg">
                       <img
-                        src={item.images?.[0] ? `http://localhost:3001${item.images[0]}` : 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=100'}
+                        src={item.product?.images?.[0] ? `http://localhost:3001${item.product.images[0]}` : 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=100'}
                         alt={item.title}
                         className="w-16 h-16 object-cover rounded-md"
                       />
                       <div className="flex-1">
-                        <h4 className="font-medium">{item.title}</h4>
+                        <h4 className="font-medium">{item.product?.title || item.title}</h4>
                         <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                         <p className="text-sm text-gray-600">Price: ₹{item.price} each</p>
                       </div>
@@ -209,7 +209,7 @@ const OrderHistory: React.FC = () => {
                 {order.items?.slice(0, 3).map((item: any, index: number) => (
                   <img
                     key={index}
-                    src={item.images?.[0] ? `http://localhost:3001${item.images[0]}` : 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=60'}
+                    src={item.product?.images?.[0] ? `http://localhost:3001${item.product.images[0]}` : 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=60'}
                     alt={item.title}
                     className="w-12 h-12 object-cover rounded-md"
                   />

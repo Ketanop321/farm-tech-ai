@@ -65,6 +65,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       setMessages(messagesResponse.data);
     } catch (error) {
       console.error('Failed to initialize chat:', error);
+      // Create a fallback chat ID for demo purposes
+      const fallbackChatId = `chat_${farmerId}_${user?.id}`;
+      setChatId(fallbackChatId);
     } finally {
       setIsLoading(false);
     }

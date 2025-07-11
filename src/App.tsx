@@ -147,6 +147,12 @@ const AppContent: React.FC = () => {
   };
 
   const handleChatWithFarmer = (farmerId: string, farmerName: string) => {
+    // Only allow buyers to chat with farmers
+    if (user?.role !== 'buyer') {
+      alert('Only buyers can chat with farmers');
+      return;
+    }
+    
     setChatFarmerId(farmerId);
     setChatFarmerName(farmerName);
     setCurrentPage('chat');

@@ -266,7 +266,7 @@ class Database {
   getProducts(filters = {}) {
     return new Promise((resolve, reject) => {
       let query = `
-        SELECT p.*, f.farmName, u.firstName, u.lastName 
+        SELECT p.*, f.farmName, f.id as farmerId, u.firstName, u.lastName 
         FROM products p 
         JOIN farmers f ON p.farmerId = f.id 
         JOIN users u ON f.userId = u.id 
@@ -291,6 +291,7 @@ class Database {
         else {
           const products = rows.map(row => ({
             ...row,
+            farmerId: row.farmerId,
             images: JSON.parse(row.images || '[]')
           }));
           resolve(products);
@@ -302,7 +303,7 @@ class Database {
   getProductById(id) {
     return new Promise((resolve, reject) => {
       this.db.get(
-        `SELECT p.*, f.farmName, u.firstName, u.lastName 
+        `SELECT p.*, f.farmName, f.id as farmerId, u.firstName, u.lastName 
          FROM products p 
          JOIN farmers f ON p.farmerId = f.id 
          JOIN users u ON f.userId = u.id 
@@ -313,6 +314,7 @@ class Database {
           else {
             if (row) {
               row.images = JSON.parse(row.images || '[]');
+              row.farmerId = row.farmerId;
             }
             resolve(row);
           }

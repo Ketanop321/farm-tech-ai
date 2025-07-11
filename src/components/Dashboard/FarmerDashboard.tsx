@@ -18,10 +18,15 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
   onEditProduct
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [localOrders, setLocalOrders] = useState(orders);
 
-  const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+  useEffect(() => {
+    setLocalOrders(orders);
+  }, [orders]);
+
+  const totalRevenue = localOrders.reduce((sum, order) => sum + order.totalAmount, 0);
   const activeProducts = products.filter(p => p.isActive);
-  const thisMonthOrders = orders.filter(order => {
+  const thisMonthOrders = localOrders.filter(order => {
     const orderDate = new Date(order.createdAt);
     const now = new Date();
     return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
@@ -58,16 +63,25 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
     },
   ];
 
-  const recentOrders = orders.slice(0, 5);
+  const recentOrders = localOrders.slice(0, 5);
 
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
     try {
+      console.log('Updating order status:', orderId, 'to', status);
       await ordersAPI.updateStatus(orderId, status);
-      // Refresh orders would be handled by parent component
-      window.location.reload(); // Simple refresh for now
+      
+      // Update local state immediately for better UX
+      setLocalOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId ? { ...order, status } : order
+        )
+      );
+      
+      // Show success message
+      alert('Order status updated successfully!');
     } catch (error) {
       console.error('Failed to update order status:', error);
-      alert('Failed to update order status');
+      alert('Failed to update order status. Please try again.');
     }
   };
 
@@ -213,7 +227,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
             <div className="space-y-4">
-              {orders.map((order) => (
+              {localOrders.map((order) => (
                 <div key={order.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div>
@@ -231,7 +245,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                       <select
                         value={order.status}
                         onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                        className={`text-sm px-2 py-1 rounded-full border-0 ${
+                        className={`text-sm px-2 py-1 rounded-full border focus:outline-none focus:ring-2 focus:ring-green-500 ${
                           order.status === 'delivered' ? 'bg-green-100 text-green-800' :
                           order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
                           order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
@@ -249,7 +263,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                   </div>
                 </div>
               ))}
-              {orders.length === 0 && (
+              {localOrders.length === 0 && (
                 <p className="text-gray-500 text-center py-8">No orders yet</p>
               )}
             </div>
