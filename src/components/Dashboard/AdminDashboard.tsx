@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, TrendingUp, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Users, ShoppingBag, TrendingUp, AlertCircle, CheckCircle, XCircle, Settings, Eye, UserCheck, UserX } from 'lucide-react';
 import { adminAPI } from '../../services/api';
 
 interface AdminDashboardProps {
@@ -17,6 +17,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -53,6 +54,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleRejectFarmer = async (farmerId: string) => {
+    try {
+      // API call for rejection would go here
+      onRejectVendor(farmerId);
+      alert('Farmer rejected successfully');
+    } catch (error) {
+      console.error('Failed to reject farmer:', error);
+      alert('Failed to reject farmer');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -85,7 +97,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     },
     {
       title: 'Pending Approvals',
-      value: '3',
+      value: users.filter((user: any) => user.role === 'farmer' && !user.isVerified).length.toString(),
       change: '+3',
       positive: false,
       icon: AlertCircle,
@@ -94,13 +106,116 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const farmers = users.filter((user: any) => user.role === 'farmer');
   const buyers = users.filter((user: any) => user.role === 'buyer');
+  const pendingFarmers = farmers.filter((farmer: any) => !farmer.isVerified);
+
+  const UserModal = ({ user, onClose }: { user: any; onClose: () => void }) => (
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl">
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b">
+            <h2 className="text-xl font-semibold">User Details</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">×</button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <Users className="h-10 w-10 text-gray-500" />
+                </div>
+                <h3 className="text-lg font-semibold">{user.firstName} {user.lastName}</h3>
+                <p className="text-gray-600">{user.email}</p>
+                <span className={`inline-block px-2 py-1 rounded-full text-sm ${
+                  user.role === 'farmer' ? 'bg-green-100 text-green-800' :
+                  user.role === 'buyer' ? 'bg-blue-100 text-blue-800' :
+                  'bg-purple-100 text-purple-800'
+                }`}>
+                  {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Phone</label>
+                  <p className="text-gray-900">{user.phone || 'Not provided'}</p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Member Since</label>
+                  <p className="text-gray-900">{new Date(user.createdAt).toLocaleDateString()}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Status</label>
+                  <p className={`${user.isVerified ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {user.isVerified ? 'Verified' : 'Pending Verification'}
+                  </p>
+                </div>
+
+                {user.role === 'farmer' && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Farm Name</label>
+                      <p className="text-gray-900">{user.farmName || 'Not provided'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Farm Address</label>
+                      <p className="text-gray-900">{user.farmAddress || 'Not provided'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">License Number</label>
+                      <p className="text-gray-900">{user.licenseNumber || 'Not provided'}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {user.role === 'farmer' && !user.isVerified && (
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      handleApproveFarmer(user.id);
+                      onClose();
+                    }}
+                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center space-x-2"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    <span>Approve</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleRejectFarmer(user.id);
+                      onClose();
+                    }}
+                    className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center space-x-2"
+                  >
+                    <UserX className="h-4 w-4" />
+                    <span>Reject</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600">Manage your marketplace and monitor performance</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-600">Manage your marketplace and monitor performance</p>
+        </div>
+        <button className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200">
+          <Settings className="h-4 w-4" />
+          <span>Dashboard Settings</span>
+        </button>
       </div>
 
       {/* Stats Grid */}
@@ -132,7 +247,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8">
-          {['overview', 'vendors', 'products', 'orders'].map((tab) => (
+          {['overview', 'vendors', 'products', 'orders', 'settings'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -183,39 +298,91 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {activeTab === 'vendors' && (
           <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Vendor Management</h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold">Vendor Management</h3>
+              <div className="flex space-x-4 text-sm">
+                <span className="text-gray-600">Total: {farmers.length}</span>
+                <span className="text-green-600">Approved: {farmers.filter((f: any) => f.isVerified).length}</span>
+                <span className="text-yellow-600">Pending: {pendingFarmers.length}</span>
+              </div>
+            </div>
             
-            <div className="space-y-4">
-              <h4 className="font-medium">All Vendors</h4>
-              {farmers.map((farmer: any) => (
-                <div key={farmer.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{farmer.firstName} {farmer.lastName}</p>
-                    <p className="text-sm text-gray-600">{farmer.email}</p>
-                    <p className="text-sm text-gray-500">
-                      Joined: {new Date(farmer.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded-full text-sm ${
-                      farmer.isVerified
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {farmer.isVerified ? 'Verified' : 'Pending'}
-                    </span>
-                    {!farmer.isVerified && (
-                      <button
-                        onClick={() => handleApproveFarmer(farmer.id)}
-                        className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        <span>Approve</span>
-                      </button>
-                    )}
-                  </div>
+            {/* Pending Approvals */}
+            {pendingFarmers.length > 0 && (
+              <div className="mb-6">
+                <h4 className="font-medium text-red-600 mb-3 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Pending Approvals ({pendingFarmers.length})
+                </h4>
+                <div className="space-y-3">
+                  {pendingFarmers.map((farmer: any) => (
+                    <div key={farmer.id} className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div>
+                        <p className="font-medium">{farmer.firstName} {farmer.lastName}</p>
+                        <p className="text-sm text-gray-600">{farmer.email}</p>
+                        <p className="text-sm text-gray-500">Farm: {farmer.farmName || 'Not provided'}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setSelectedUser(farmer)}
+                          className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          onClick={() => handleApproveFarmer(farmer.id)}
+                          className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          onClick={() => handleRejectFarmer(farmer.id)}
+                          className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* All Vendors */}
+            <div>
+              <h4 className="font-medium mb-3">All Vendors</h4>
+              <div className="space-y-3">
+                {farmers.map((farmer: any) => (
+                  <div key={farmer.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium">{farmer.firstName} {farmer.lastName}</p>
+                      <p className="text-sm text-gray-600">{farmer.email}</p>
+                      <p className="text-sm text-gray-500">
+                        Joined: {new Date(farmer.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded-full text-sm ${
+                        farmer.isVerified
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {farmer.isVerified ? 'Verified' : 'Pending'}
+                      </span>
+                      <button
+                        onClick={() => setSelectedUser(farmer)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span>View</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -279,7 +446,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
         )}
+
+        {activeTab === 'settings' && (
+          <div className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Dashboard Settings</h3>
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-medium mb-2">Platform Settings</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" defaultChecked />
+                    <span>Auto-approve verified farmers</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" defaultChecked />
+                    <span>Send email notifications for new orders</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" />
+                    <span>Enable maintenance mode</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-medium mb-2">Commission Settings</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm text-gray-600">Platform Commission (%)</label>
+                    <input type="number" defaultValue="5" className="mt-1 block w-32 px-3 py-2 border border-gray-300 rounded-md" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600">Payment Processing Fee (%)</label>
+                    <input type="number" defaultValue="2.5" className="mt-1 block w-32 px-3 py-2 border border-gray-300 rounded-md" />
+                  </div>
+                </div>
+              </div>
+
+              <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                Save Settings
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* User Details Modal */}
+      {selectedUser && (
+        <UserModal
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+        />
+      )}
     </div>
   );
 };

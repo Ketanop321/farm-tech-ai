@@ -1,12 +1,15 @@
 import React from 'react';
 import { ShoppingCart, Heart, Star, MapPin, MessageCircle, Edit } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ProductCardProps {
   product: any;
   onAddToCart: (productId: string) => void;
   onProductClick: (productId: string) => void;
   onChatWithFarmer?: (farmerId: string, farmerName: string) => void;
+  onToggleFavorite?: (productId: string) => void;
   showEditOptions?: boolean;
+  isFavorite?: boolean;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -14,11 +17,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart, 
   onProductClick,
   onChatWithFarmer,
-  showEditOptions = false
+  onToggleFavorite,
+  showEditOptions = false,
+  isFavorite = false
 }) => {
+  const { user } = useAuth();
   const imageUrl = product.images && product.images.length > 0 
     ? `http://localhost:3001${product.images[0]}`
     : 'https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=400';
+
+  const isOwnProduct = user?.role === 'farmer' && user?.farmer?.id === product.farmerId;
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
@@ -29,9 +37,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
           className="w-full h-48 object-cover cursor-pointer"
           onClick={() => onProductClick(product.id)}
         />
-        <button className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors">
-          <Heart className="h-5 w-5 text-gray-400 hover:text-red-500" />
-        </button>
+        {user?.role === 'buyer' && onToggleFavorite && (
+          <button 
+            onClick={() => onToggleFavorite(product.id)}
+            className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors"
+          >
+            <Heart className={`h-5 w-5 ${isFavorite ? 'text-red-500 fill-current' : 'text-gray-400'} hover:text-red-500`} />
+          </button>
+        )}
         {product.stock < 10 && (
           <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium">
             Low Stock
@@ -64,7 +77,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </div>
           
           <div className="flex items-center space-x-2">
-            {showEditOptions ? (
+            {showEditOptions || isOwnProduct ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -77,7 +90,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </button>
             ) : (
               <>
-                {onChatWithFarmer && (
+                {user?.role === 'buyer' && onChatWithFarmer && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -90,21 +103,23 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   </button>
                 )}
                 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddToCart(product.id);
-                  }}
-                  disabled={product.stock === 0}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-colors ${
-                    product.stock === 0
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700 text-white'
-                  }`}
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  <span className="text-sm font-medium">Add</span>
-                </button>
+                {user?.role === 'buyer' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddToCart(product.id);
+                    }}
+                    disabled={product.stock === 0}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-colors ${
+                      product.stock === 0
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                    }`}
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    <span className="text-sm font-medium">Add</span>
+                  </button>
+                )}
               </>
             )}
           </div>

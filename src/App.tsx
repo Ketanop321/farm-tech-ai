@@ -7,6 +7,10 @@ import Cart from './components/Cart/Cart';
 import FarmerDashboard from './components/Dashboard/FarmerDashboard';
 import AdminDashboard from './components/Dashboard/AdminDashboard';
 import ChatWindow from './components/Chat/ChatWindow';
+import ChatHistory from './components/Chat/ChatHistory';
+import SettingsPage from './components/Settings/SettingsPage';
+import FavoritesPage from './components/Favorites/FavoritesPage';
+import OrderHistory from './components/Orders/OrderHistory';
 import AuthProvider from './components/Auth/AuthProvider';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
@@ -27,11 +31,14 @@ const AppContent: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [chatFarmerId, setChatFarmerId] = useState<string | null>(null);
   const [chatFarmerName, setChatFarmerName] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
       loadProducts();
       loadOrders();
+      loadFavorites();
     }
   }, [user]);
 
@@ -51,6 +58,24 @@ const AppContent: React.FC = () => {
     } catch (error) {
       console.error('Failed to load orders:', error);
     }
+  };
+
+  const loadFavorites = () => {
+    if (user) {
+      const savedFavorites = localStorage.getItem(`favorites_${user.id}`) || '[]';
+      setFavorites(JSON.parse(savedFavorites));
+    }
+  };
+
+  const handleToggleFavorite = (productId: string) => {
+    if (!user) return;
+    
+    const updatedFavorites = favorites.includes(productId)
+      ? favorites.filter(id => id !== productId)
+      : [...favorites, productId];
+    
+    setFavorites(updatedFavorites);
+    localStorage.setItem(`favorites_${user.id}`, JSON.stringify(updatedFavorites));
   };
 
   const handleAddToCart = (productId: string) => {
@@ -127,6 +152,11 @@ const AppContent: React.FC = () => {
     setCurrentPage('chat');
   };
 
+  const handleSelectChat = (farmerId: string, farmerName: string) => {
+    setChatFarmerId(farmerId);
+    setChatFarmerName(farmerName);
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -182,6 +212,9 @@ const AppContent: React.FC = () => {
               onAddToCart={handleAddToCart}
               onProductClick={(id) => console.log('Product clicked:', id)}
               onChatWithFarmer={handleChatWithFarmer}
+              onToggleFavorite={handleToggleFavorite}
+              favorites={favorites}
+              searchQuery={searchQuery}
             />
           </div>
         );
@@ -215,64 +248,41 @@ const AppContent: React.FC = () => {
         break;
 
       case 'chat':
-        if (chatFarmerId) {
-          return (
-            <div className="max-w-4xl mx-auto">
-              <ChatWindow
-                farmerId={chatFarmerId}
-                farmerName={chatFarmerName}
-                onClose={() => {
-                  setChatFarmerId(null);
-                  setChatFarmerName('');
-                  setCurrentPage('home');
-                }}
-              />
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <ChatHistory onSelectChat={handleSelectChat} />
             </div>
-          );
-        }
-        return (
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold mb-4">Messages</h2>
-            <p className="text-gray-600">Select a farmer to start chatting.</p>
-          </div>
-        );
-
-      case 'orders':
-        return (
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold mb-4">
-              {user.role === 'farmer' ? 'Your Orders' : 'Order History'}
-            </h2>
-            <div className="space-y-4">
-              {orders.map((order: any) => (
-                <div key={order.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">Order #{order.id.slice(-6)}</p>
-                      <p className="text-sm text-gray-600">{order.items?.length || 0} items</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(order.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">₹{order.totalAmount}</p>
-                      <span className={`text-sm px-2 py-1 rounded-full ${
-                        order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                        order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {order.status}
-                      </span>
-                    </div>
-                  </div>
+            <div className="lg:col-span-2">
+              {chatFarmerId ? (
+                <ChatWindow
+                  farmerId={chatFarmerId}
+                  farmerName={chatFarmerName}
+                  onClose={() => {
+                    setChatFarmerId(null);
+                    setChatFarmerName('');
+                  }}
+                />
+              ) : (
+                <div className="bg-white rounded-lg shadow-sm border p-6 h-96 flex items-center justify-center">
+                  <p className="text-gray-500">Select a conversation to start chatting</p>
                 </div>
-              ))}
-              {orders.length === 0 && (
-                <p className="text-gray-500 text-center py-8">No orders found.</p>
               )}
             </div>
           </div>
         );
+
+      case 'orders':
+        return <OrderHistory />;
+
+      case 'settings':
+        return <SettingsPage />;
+
+      case 'favorites':
+        if (user.role === 'buyer') {
+          return <FavoritesPage />;
+        }
+        break;
 
       case 'my-products':
         if (user.role === 'farmer') {
@@ -296,7 +306,9 @@ const AppContent: React.FC = () => {
                   setIsAddProductOpen(true);
                 }}
                 onChatWithFarmer={handleChatWithFarmer}
+                onToggleFavorite={handleToggleFavorite}
                 showEditOptions={true}
+                favorites={favorites}
               />
             </div>
           );
@@ -318,6 +330,7 @@ const AppContent: React.FC = () => {
       <Header
         onCartClick={() => setIsCartOpen(true)}
         cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+        onPageChange={setCurrentPage}
       />
       
       <Navigation
@@ -329,28 +342,32 @@ const AppContent: React.FC = () => {
         {renderContent()}
       </main>
 
-      <Cart
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        items={cartItems}
-        onUpdateQuantity={handleUpdateQuantity}
-        onRemoveItem={handleRemoveItem}
-        onCheckout={handleCheckout}
-      />
+      {user.role === 'buyer' && (
+        <Cart
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          items={cartItems}
+          onUpdateQuantity={handleUpdateQuantity}
+          onRemoveItem={handleRemoveItem}
+          onCheckout={handleCheckout}
+        />
+      )}
 
-      <AddProductForm
-        isOpen={isAddProductOpen}
-        onClose={() => {
-          setIsAddProductOpen(false);
-          setSelectedProduct(null);
-        }}
-        onProductAdded={() => {
-          loadProducts();
-          setIsAddProductOpen(false);
-          setSelectedProduct(null);
-        }}
-        product={selectedProduct}
-      />
+      {user.role === 'farmer' && (
+        <AddProductForm
+          isOpen={isAddProductOpen}
+          onClose={() => {
+            setIsAddProductOpen(false);
+            setSelectedProduct(null);
+          }}
+          onProductAdded={() => {
+            loadProducts();
+            setIsAddProductOpen(false);
+            setSelectedProduct(null);
+          }}
+          product={selectedProduct}
+        />
+      )}
     </div>
   );
 };
