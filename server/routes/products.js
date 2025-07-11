@@ -4,6 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import authenticateToken from '../middleware/authmiddleware.js'
 
 // ES module equivalents for __dirname and __filename
 const __filename = fileURLToPath(import.meta.url);
@@ -12,7 +13,7 @@ const __dirname = dirname(__filename);
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, './uploads/');
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -37,8 +38,7 @@ const upload = multer({
 });
 
 export default (db, JWT_SECRET) => {
-  const authModule = await import('./auth.js');
-  const { authenticateToken } = authModule.default(db, JWT_SECRET);
+  const authMiddleware = authenticateToken(JWT_SECRET);
   const router = express.Router();
 
   // Get all products
@@ -68,7 +68,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Create product (farmers only)
-  router.post('/', authenticateToken, upload.array('images', 5), async (req, res) => {
+  router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => {
     try {
       if (req.user.role !== 'farmer') {
         return res.status(403).json({ error: 'Only farmers can create products' });
@@ -106,7 +106,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Update product (farmers only)
-  router.put('/:id', authenticateToken, upload.array('images', 5), async (req, res) => {
+  router.put('/:id', authMiddleware, upload.array('images', 5), async (req, res) => {
     try {
       if (req.user.role !== 'farmer') {
         return res.status(403).json({ error: 'Only farmers can update products' });

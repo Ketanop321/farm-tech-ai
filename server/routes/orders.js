@@ -1,13 +1,14 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import authenticateToken from '../middleware/authmiddleware.js';
 
-export default (db, JWT_SECRET) => {
-  const authModule = await import('./auth.js');
-  const { authenticateToken } = authModule.default(db, JWT_SECRET);
+export default async(db, JWT_SECRET) => {
+  
+  const authMiddleware = authenticateToken(JWT_SECRET);
   const router = express.Router();
 
   // Create order
-  router.post('/', authenticateToken, async (req, res) => {
+  router.post('/', authMiddleware, async (req, res) => {
     try {
       const { items, shippingAddress, paymentMethod } = req.body;
       

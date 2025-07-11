@@ -19,8 +19,12 @@ const __dirname = dirname(__filename);
 dotenv.config();
 
 import Database from './database.js';
+// import authRoutes from './routes/auth.js';
+// import productRoutes from './routes/products.js';
+
 import authRoutes from './routes/auth.js';
-import productRoutes from './routes/products.js';
+import productsRoutes from './routes/products.js';
+
 import orderRoutes from './routes/orders.js';
 import chatRoutes from './routes/chat.js';
 import adminRoutes from './routes/admin.js';
@@ -72,12 +76,24 @@ io.on('connection', (socket) => {
   });
 });
 
+const authRouter = authRoutes(db, process.env.JWT_SECRET);
+const productsRouter = productsRoutes(db, process.env.JWT_SECRET); // ✅ await here
+const orderRouter = await orderRoutes(db, JWT_SECRET);
+const chatRouter = await chatRoutes(db, JWT_SECRET);
+const adminRouter = await adminRoutes(db, JWT_SECRET);
+
+app.use('/api/auth', authRouter);
+app.use('/api/products', productsRouter); // ✅ now safe
+app.use('/api/orders', orderRouter);
+app.use('/api/chat', chatRouter);
+app.use('/api/admin', adminRouter);
+
 // Routes
-app.use('/api/auth', authRoutes(db, JWT_SECRET));
-app.use('/api/products', productRoutes(db, JWT_SECRET));
-app.use('/api/orders', orderRoutes(db, JWT_SECRET));
-app.use('/api/chat', chatRoutes(db, JWT_SECRET));
-app.use('/api/admin', adminRoutes(db, JWT_SECRET));
+// app.use('/api/auth', authRoutes(db, JWT_SECRET))
+// app.use('/api/products', productRoutes(db, JWT_SECRET));
+// app.use('/api/orders', orderRoutes(db, JWT_SECRET));
+// app.use('/api/chat', chatRoutes(db, JWT_SECRET));
+// app.use('/api/admin', adminRoutes(db, JWT_SECRET));
 
 // Health check
 app.get('/api/health', (req, res) => {

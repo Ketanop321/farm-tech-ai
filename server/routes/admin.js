@@ -1,8 +1,8 @@
 import express from 'express';
+import authenticateToken from '../middleware/authmiddleware.js';
 
-export default (db, JWT_SECRET) => {
-  const authModule = await import('./auth.js');
-  const { authenticateToken } = authModule.default(db, JWT_SECRET);
+export default async (db, JWT_SECRET) => {
+  const authMiddleware = authenticateToken(JWT_SECRET);
   const router = express.Router();
 
   // Middleware to check admin role
@@ -14,7 +14,7 @@ export default (db, JWT_SECRET) => {
   };
 
   // Get dashboard stats
-  router.get('/dashboard', authenticateToken, requireAdmin, async (req, res) => {
+  router.get('/dashboard', authMiddleware, requireAdmin, async (req, res) => {
     try {
       const users = await db.getAllUsers();
       const orders = await db.getAllOrders();
@@ -39,7 +39,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Get all users
-  router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
+  router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
     try {
       const users = await db.getAllUsers();
       res.json(users);
@@ -50,7 +50,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Get all orders
-  router.get('/orders', authenticateToken, requireAdmin, async (req, res) => {
+  router.get('/orders', authMiddleware, requireAdmin, async (req, res) => {
     try {
       const orders = await db.getAllOrders();
       
@@ -70,7 +70,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Approve farmer
-  router.patch('/farmers/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
+  router.patch('/farmers/:id/approve', authMiddleware, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await db.approveFarmer(id);
@@ -82,7 +82,7 @@ export default (db, JWT_SECRET) => {
   });
 
   // Get all products
-  router.get('/products', authenticateToken, requireAdmin, async (req, res) => {
+  router.get('/products', authMiddleware, requireAdmin, async (req, res) => {
     try {
       const products = await db.getProducts();
       res.json(products);
