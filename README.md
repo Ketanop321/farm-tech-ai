@@ -190,6 +190,8 @@ npm start
 - **Email**: `admin@farmmarket.com`
 - **Password**: `admin123`
 
+### Backend geploy on render free plan so it willl be automatic restart so pls wait 
+
 ### Testing the Application
 
 1. **Access the Application**
