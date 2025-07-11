@@ -108,6 +108,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
         
         <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
           <p className="font-medium text-blue-800 mb-2">Demo Credentials:</p>
+          <p className="text-blue-700">Farmer: farmer3@example.com / Pass789!</p>
+          <p className="text-blue-700">Buyer: buyer3@example.com / market789!</p>
           <p className="text-blue-700">Admin: admin@farmmarket.com / admin123</p>
           <p className="text-blue-700">Or register as farmer/buyer</p>
         </div>
