@@ -40,8 +40,6 @@ const io = new SocketIOServer(server, {
 
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-console.log('JWT_SECRET loaded:', JWT_SECRET);
-
 
 // Initialize database
 const db = new Database();
