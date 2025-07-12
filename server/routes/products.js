@@ -85,9 +85,7 @@ export default (db, JWT_SECRET) => {
       // Process uploaded images
       const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
 
-      const productId = uuidv4();
       const product = await db.createProduct({
-        id: productId,
         farmerId: farmer.id,
         title,
         description,
@@ -135,7 +133,7 @@ export default (db, JWT_SECRET) => {
 
       // Process new images if uploaded
       if (req.files && req.files.length > 0) {
-        updates.images = JSON.stringify(req.files.map(file => `/uploads/${file.filename}`));
+        updates.images = req.files.map(file => `/uploads/${file.filename}`);
       }
 
       await db.updateProduct(req.params.id, updates);

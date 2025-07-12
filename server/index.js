@@ -11,6 +11,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import SupabaseDatabase from './database/supabase.js';
 
 // ES module equivalents for __dirname and __filename
 const __filename = fileURLToPath(import.meta.url);
@@ -41,8 +42,8 @@ const io = new SocketIOServer(server, {
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Initialize database
-const db = new Database();
+// Initialize Supabase database
+const db = new SupabaseDatabase();
 
 // Middleware
 app.use(cors());

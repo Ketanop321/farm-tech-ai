@@ -17,9 +17,7 @@ export default async (db, JWT_SECRET) => {
       
       if (!chat) {
         // Create new chat
-        const chatId = uuidv4();
         chat = await db.createChat({
-          id: chatId,
           buyerId,
           farmerId
         });
@@ -51,9 +49,7 @@ export default async (db, JWT_SECRET) => {
       const { content, type = 'text' } = req.body;
       const senderId = req.user.userId;
 
-      const messageId = uuidv4();
       const message = await db.createMessage({
-        id: messageId,
         chatId,
         senderId,
         content,

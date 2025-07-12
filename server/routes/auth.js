@@ -24,9 +24,7 @@ export default (db, JWT_SECRET) => {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Create user
-      const userId = uuidv4();
       const user = await db.createUser({
-        id: userId,
         email,
         password: hashedPassword,
         firstName,
@@ -37,10 +35,8 @@ export default (db, JWT_SECRET) => {
 
       // If farmer, create farmer profile
       if (role === 'farmer') {
-        const farmerId = uuidv4();
         await db.createFarmer({
-          id: farmerId,
-          userId,
+          userId: user.id,
           farmName,
           farmAddress,
           licenseNumber
@@ -48,11 +44,11 @@ export default (db, JWT_SECRET) => {
       }
 
       // Generate JWT token
-      const token = jwt.sign({ userId, email, role }, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ userId: user.id, email, role }, JWT_SECRET, { expiresIn: '7d' });
       res.status(201).json({
         message: 'User registered successfully',
         token,
-        user: { id: userId, email, firstName, lastName, role }
+        user: { id: user.id, email, firstName, lastName, role }
       });
     } catch (error) {
       console.error('Registration error:', error);

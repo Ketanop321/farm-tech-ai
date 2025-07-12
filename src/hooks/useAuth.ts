@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { authAPI } from '../services/api';
+import { supabase } from '../lib/supabase';
+import bcrypt from 'bcryptjs';
 
 interface User {
   id: string;

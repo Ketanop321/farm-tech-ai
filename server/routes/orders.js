@@ -52,11 +52,8 @@ export default async(db, JWT_SECRET) => {
       const createdOrders = [];
 
       for (const [farmerId, orderData] of Object.entries(farmerOrders)) {
-        const orderId = uuidv4();
-        
         // Create order
         const order = await db.createOrder({
-          id: orderId,
           buyerId: req.user.userId,
           farmerId,
           totalAmount: orderData.total,
@@ -66,10 +63,8 @@ export default async(db, JWT_SECRET) => {
 
         // Create order items
         for (const item of orderData.items) {
-          const orderItemId = uuidv4();
           await db.createOrderItem({
-            id: orderItemId,
-            orderId,
+            orderId: order.id,
             productId: item.productId,
             quantity: item.quantity,
             price: item.price
