@@ -132,7 +132,7 @@ PORT=3001
 JWT_SECRET=your jwt secret key
 
 # SUPABASE CONFIGS
-SUPABASE_SERVICE_ROLE_KEY=your supabase service url key
+SUPABASE_SERVICE_ROLE_KEY=your supabase service role key
 SUPABASE_ANON_KEY=your supabase anon key
 SUPABASE_URL=your supabase url
 ```
