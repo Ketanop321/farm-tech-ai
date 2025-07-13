@@ -13,7 +13,7 @@ interface ChatWindowProps {
 const ChatWindow: React.FC<ChatWindowProps> = ({
   farmerId,
   farmerName,
-  onClose
+  onClose,
 }) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -23,11 +23,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
+  // 🧠 Normalize message for UI compatibility
+  const normalizeMessage = (msg: any) => ({
+    ...msg,
+    createdAt: msg.createdAt || msg.created_at || new Date().toISOString(),
+  });
+
   useEffect(() => {
     initializeChat();
-    
-    // Initialize socket connection
-    const newSocket = io('http://localhost:3001');
+
+    const newSocket = io('http://localhost:3001'); // ✅ Make sure backend socket server is here
     setSocket(newSocket);
 
     return () => {
@@ -38,10 +43,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   useEffect(() => {
     if (chatId && socket) {
       socket.emit('join-chat', chatId);
-      
+
       socket.on('new-message', (message: any) => {
-        setMessages(prev => [...prev, message]);
+        const normalized = normalizeMessage(message);
+
+        // ✅ Avoid adding duplicate message (based on ID)
+        setMessages(prev => {
+          const alreadyExists = prev.some(m => m.id === normalized.id);
+          return alreadyExists ? prev : [...prev, normalized];
+        });
       });
+
 
       return () => {
         socket.off('new-message');
@@ -55,44 +67,52 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const initializeChat = async () => {
     try {
-      // Create or get existing chat
-      const chatResponse = await chatAPI.createChat(farmerId);
-      const chat = chatResponse.data;
+      setIsLoading(true);
+      const response = await chatAPI.createChat(farmerId);
+      const chat = response?.data?.id ? response.data : response;
       setChatId(chat.id);
 
-      // Load messages
       const messagesResponse = await chatAPI.getMessages(chat.id);
-      setMessages(messagesResponse.data);
+
+      const loadedMessages = Array.isArray(messagesResponse?.messages)
+        ? messagesResponse.messages
+        : Array.isArray(messagesResponse)
+          ? messagesResponse
+          : [];
+
+      if (!Array.isArray(loadedMessages)) {
+        console.warn('⚠️ Expected array but got:', messagesResponse);
+      }
+
+      setMessages(loadedMessages.map(normalizeMessage));
     } catch (error) {
-      console.error('Failed to initialize chat:', error);
-      // Create a fallback chat ID for demo purposes
-      const fallbackChatId = `chat_${farmerId}_${user?.id}`;
-      setChatId(fallbackChatId);
+      console.error('❌ Failed to initialize chat:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !chatId) return;
 
-    try {
-      const messageData = {
-        chatId,
-        content: newMessage,
-        type: 'text',
-        senderId: user?.id
-      };
+    const tempMessage = {
+      id: Date.now().toString(), // temporary unique ID
+      chatId,
+      content: newMessage,
+      type: 'text',
+      senderId: user?.id,
+      createdAt: new Date().toISOString(),
+    };
 
-      // Send via socket for real-time delivery
-      socket.emit('send-message', messageData);
-      
-      // Also send via API for persistence
+    setMessages(prev => [...prev, tempMessage]);
+    setNewMessage('');
+
+    try {
+      socket?.emit('send-message', tempMessage);
       await chatAPI.sendMessage(chatId, newMessage);
-      
-      setNewMessage('');
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('❌ Failed to send message:', error);
     }
   };
 
@@ -124,7 +144,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             <MoreVertical className="h-5 w-5 text-gray-500" />
           </button>
           {onClose && (
-            <button 
+            <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-full text-gray-500"
             >
@@ -147,11 +167,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                  message.senderId === user?.id
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-900'
-                }`}
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.senderId === user?.id
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-100 text-gray-900'
+                  }`}
               >
                 {message.type === 'text' ? (
                   <p className="text-sm">{message.content}</p>
@@ -162,9 +181,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     className="max-w-full h-auto rounded-md"
                   />
                 )}
-                <p className={`text-xs mt-1 ${
-                  message.senderId === user?.id ? 'text-green-100' : 'text-gray-500'
-                }`}>
+                <p className={`text-xs mt-1 ${message.senderId === user?.id ? 'text-green-100' : 'text-gray-500'
+                  }`}>
                   {new Date(message.createdAt).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',

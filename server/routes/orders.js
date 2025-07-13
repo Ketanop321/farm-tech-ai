@@ -2,7 +2,8 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import authenticateToken from '../middleware/authmiddleware.js';
 
-export default async (db, JWT_SECRET) => {
+export default async(db, JWT_SECRET) => {
+  
   const authMiddleware = authenticateToken(JWT_SECRET);
   const router = express.Router();
 
@@ -13,10 +14,6 @@ export default async (db, JWT_SECRET) => {
       
       if (!items || items.length === 0) {
         return res.status(400).json({ error: 'Order must contain at least one item' });
-      }
-
-      if (!shippingAddress) {
-        return res.status(400).json({ error: 'Shipping address is required' });
       }
 
       // Group items by farmer
@@ -55,24 +52,19 @@ export default async (db, JWT_SECRET) => {
       const createdOrders = [];
 
       for (const [farmerId, orderData] of Object.entries(farmerOrders)) {
-        const orderId = uuidv4();
-        
         // Create order
         const order = await db.createOrder({
-          id: orderId,
           buyerId: req.user.userId,
           farmerId,
           totalAmount: orderData.total,
           shippingAddress,
-          paymentMethod: paymentMethod || 'cash_on_delivery'
+          paymentMethod
         });
 
         // Create order items
         for (const item of orderData.items) {
-          const orderItemId = uuidv4();
           await db.createOrderItem({
-            id: orderItemId,
-            orderId,
+            orderId: order.id,
             productId: item.productId,
             quantity: item.quantity,
             price: item.price
@@ -116,15 +108,11 @@ export default async (db, JWT_SECRET) => {
     }
   });
 
-  // Update order status (farmers and admins only)
+  // Update order status (farmers only)
   router.patch('/:id/status', authMiddleware, async (req, res) => {
     try {
       const { status } = req.body;
       const orderId = req.params.id;
-
-      if (!status) {
-        return res.status(400).json({ error: 'Status is required' });
-      }
 
       if (req.user.role !== 'farmer' && req.user.role !== 'admin') {
         return res.status(403).json({ error: 'Only farmers and admins can update order status' });
@@ -135,11 +123,7 @@ export default async (db, JWT_SECRET) => {
         return res.status(400).json({ error: 'Invalid status' });
       }
 
-      const result = await db.updateOrderStatus(orderId, status);
-      
-      if (result === 0) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
+      await db.updateOrderStatus(orderId, status);
       
       res.json({ message: 'Order status updated successfully' });
     } catch (error) {

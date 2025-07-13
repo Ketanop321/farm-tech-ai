@@ -1,4 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
+import { supabase } from '../lib/supabase';
+import bcrypt from 'bcryptjs';
 import { authAPI } from '../services/api';
 
 interface User {
@@ -7,13 +9,11 @@ interface User {
   firstName: string;
   lastName: string;
   role: 'farmer' | 'buyer' | 'admin';
-  phone?: string;
   farmer?: {
     id: string;
     farmName: string;
     farmAddress: string;
     isApproved: boolean;
-    licenseNumber?: string;
   };
 }
 
@@ -23,7 +23,6 @@ interface AuthContextType {
   register: (userData: any) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
-  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,24 +38,17 @@ export const useAuth = () => {
 export const useAuthProvider = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
-      
-      if (token && savedUser) {
+      if (token) {
         try {
-          // Verify token is still valid
           const response = await authAPI.getCurrentUser();
           setUser(response.data);
         } catch (error) {
-          console.error('Token validation failed:', error);
-          // Clear invalid data
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          setUser(null);
         }
       }
       setIsLoading(false);
@@ -67,66 +59,34 @@ export const useAuthProvider = () => {
 
   const login = async (email: string, password: string) => {
     try {
-      setError(null);
-      setIsLoading(true);
-      
       const response = await authAPI.login({ email, password });
       const { token, user: userData } = response.data;
       
-      // Store auth data
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
-      
-      console.log('Login successful:', userData);
     } catch (error: any) {
-      console.error('Login error:', error);
-      const errorMessage = error.response?.data?.error || 'Login failed. Please try again.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      throw new Error(error.response?.data?.error || 'Login failed');
     }
   };
 
   const register = async (userData: any) => {
     try {
-      setError(null);
-      setIsLoading(true);
-      
       const response = await authAPI.register(userData);
       const { token, user: newUser } = response.data;
       
-      // Store auth data
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(newUser));
       setUser(newUser);
-      
-      console.log('Registration successful:', newUser);
     } catch (error: any) {
-      console.error('Registration error:', error);
-      const errorMessage = error.response?.data?.error || 'Registration failed. Please try again.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      throw new Error(error.response?.data?.error || 'Registration failed');
     }
   };
 
   const logout = () => {
-    try {
-      // Call logout API (optional)
-      authAPI.logout().catch(console.error);
-    } catch (error) {
-      console.error('Logout API error:', error);
-    } finally {
-      // Clear local data regardless of API call result
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-      setError(null);
-      console.log('Logout successful');
-    }
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
   };
 
   return {
@@ -135,7 +95,6 @@ export const useAuthProvider = () => {
     register,
     logout,
     isLoading,
-    error,
   };
 };
 
