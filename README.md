@@ -123,24 +123,26 @@ npm install
 ```
 
 ### Step 3: Environment Setup
-Create a `.env` file in the root directory:
+Create a `.env` inside server folder:
 ```env
 # Server Configuration
 PORT=3001
-NODE_ENV=development
 
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-here
+# JWT SECRET
+JWT_SECRET=your jwt secret key
 
-# Database Configuration
-DB_PATH=./marketplace.db
+# SUPABASE CONFIGS
+SUPABASE_SERVICE_ROLE_KEY=your supabase service url key
+SUPABASE_ANON_KEY=your supabase anon key
+SUPABASE_URL=your supabase url
+```
 
-# File Upload Configuration
-UPLOAD_PATH=./uploads
-MAX_FILE_SIZE=5242880
+Create a `.env` inside src folder:
+```env
+# SUPABASE CONFIG
 
-# Socket.IO Configuration
-SOCKET_CORS_ORIGIN=http://localhost:5173
+VITE_SUPABASE_ANON_KEY=your supabase anon key
+VITE_SUPABASE_URL=your supabase url
 ```
 
 ### Step 4: Database Setup
