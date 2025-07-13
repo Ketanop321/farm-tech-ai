@@ -18,8 +18,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 dotenv.config();
-
-import Database from './database.js';
 // import authRoutes from './routes/auth.js';
 // import productRoutes from './routes/products.js';
 

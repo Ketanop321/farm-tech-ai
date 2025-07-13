@@ -21,14 +21,14 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -75,15 +75,31 @@ export default (db, JWT_SECRET) => {
       }
 
       const { title, description, category, price, stock, unit } = req.body;
-      
-      // Get farmer info
+
       const farmer = await db.getFarmerByUserId(req.user.userId);
       if (!farmer) {
         return res.status(404).json({ error: 'Farmer profile not found' });
       }
 
-      // Process uploaded images
-      const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+      let images = [];
+
+      if (req.files && req.files.length > 0) {
+        images = req.files.map(file => `/uploads/${file.filename}`);
+      } else if (req.body.images) {
+        try {
+          if (typeof req.body.images === 'string') {
+            images = JSON.parse(req.body.images);
+          } else {
+            images = req.body.images;
+          }
+
+          if (!Array.isArray(images)) {
+            images = [images];
+          }
+        } catch (e) {
+          images = [];
+        }
+      }
 
       const product = await db.createProduct({
         farmerId: farmer.id,
@@ -98,10 +114,11 @@ export default (db, JWT_SECRET) => {
 
       res.status(201).json(product);
     } catch (error) {
-      console.error('Create product error:', error);
       res.status(500).json({ error: 'Failed to create product' });
     }
   });
+
+
 
   // Update product (farmers only)
   router.put('/:id', authMiddleware, upload.array('images', 5), async (req, res) => {
@@ -137,7 +154,7 @@ export default (db, JWT_SECRET) => {
       }
 
       await db.updateProduct(req.params.id, updates);
-      
+
       const updatedProduct = await db.getProductById(req.params.id);
       res.json(updatedProduct);
     } catch (error) {

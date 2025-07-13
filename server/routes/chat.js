@@ -12,11 +12,13 @@ export default async (db, JWT_SECRET) => {
       const { farmerId } = req.body;
       const buyerId = req.user.userId;
 
-      // Check if chat already exists
+      if (!farmerId) {
+        return res.status(400).json({ error: 'Farmer ID is required' });
+      }
+
       let chat = await db.getChatByUsers(buyerId, farmerId);
-      
+
       if (!chat) {
-        // Create new chat
         chat = await db.createChat({
           buyerId,
           farmerId
@@ -25,29 +27,34 @@ export default async (db, JWT_SECRET) => {
 
       res.json(chat);
     } catch (error) {
-      console.error('Create chat error:', error);
       res.status(500).json({ error: 'Failed to create chat' });
     }
   });
 
-  // Get messages for a chat
-  router.get('/:chatId/messages', authMiddleware, async (req, res) => {
+  // Get messages from a specific chat
+  router.get('/:chatId/messages', async (req, res) => {
+    const { chatId } = req.params;
+
     try {
-      const { chatId } = req.params;
-      const messages = await db.getMessages(chatId);
+      const messages = await db.getChatsByUser(chatId);
       res.json(messages);
     } catch (error) {
-      console.error('Get messages error:', error);
-      res.status(500).json({ error: 'Failed to get messages' });
+      res.status(500).json({ error: 'Failed to fetch messages' });
     }
   });
 
-  // Send message
+  // Send message in chat
   router.post('/:chatId/messages', authMiddleware, async (req, res) => {
     try {
       const { chatId } = req.params;
       const { content, type = 'text' } = req.body;
       const senderId = req.user.userId;
+
+      const chat = await db.getChatById(chatId);
+
+      if (!chat || (chat.buyer_id !== senderId && chat.farmer_id !== senderId)) {
+        return res.status(403).json({ error: 'You are not a participant in this chat' });
+      }
 
       const message = await db.createMessage({
         chatId,
@@ -58,8 +65,25 @@ export default async (db, JWT_SECRET) => {
 
       res.status(201).json(message);
     } catch (error) {
-      console.error('Send message error:', error);
       res.status(500).json({ error: 'Failed to send message' });
+    }
+  });
+
+  // Get chats for specific user
+  router.get('/user/:userId', async (req, res) => {
+    const userId = req.params.userId;
+    const chats = await db.getChatsByUser(userId);
+    res.json(chats.rows);
+  });
+
+  // Get chats for authenticated user
+  router.get('/my', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const chats = await db.getChatsByUser(userId);
+      res.json(chats);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch user chats' });
     }
   });
 

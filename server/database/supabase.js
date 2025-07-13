@@ -35,14 +35,14 @@ class SupabaseDatabase {
 
       if (!existingAdmin) {
         const hashedPassword = await bcrypt.hash('admin123', 10);
-        
+
         const { error } = await this.supabase
           .from('users')
           .insert({
             email: 'admin@farmmarket.com',
             password: hashedPassword,
-            first_name: 'Admin',
-            last_name: 'User',
+            firstName: 'Admin',
+            lastName: 'User',
             role: 'admin',
             is_verified: true
           });
@@ -65,8 +65,8 @@ class SupabaseDatabase {
       .insert({
         email: userData.email,
         password: userData.password,
-        first_name: userData.firstName,
-        last_name: userData.lastName,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
         phone: userData.phone,
         role: userData.role
       })
@@ -167,8 +167,8 @@ class SupabaseDatabase {
           id,
           farm_name,
           users!inner(
-            first_name,
-            last_name
+            firstName,
+            lastName
           )
         )
       `)
@@ -191,8 +191,8 @@ class SupabaseDatabase {
       ...product,
       farmerId: product.farmer_id,
       farmName: product.farmers.farm_name,
-      firstName: product.farmers.users.first_name,
-      lastName: product.farmers.users.last_name
+      firstName: product.farmers.users.firstName,
+      lastName: product.farmers.users.lastName
     }));
   }
 
@@ -205,8 +205,8 @@ class SupabaseDatabase {
           id,
           farm_name,
           users!inner(
-            first_name,
-            last_name
+            firstName,
+            lastName
           )
         )
       `)
@@ -219,8 +219,8 @@ class SupabaseDatabase {
       ...data,
       farmerId: data.farmer_id,
       farmName: data.farmers.farm_name,
-      firstName: data.farmers.users.first_name,
-      lastName: data.farmers.users.last_name
+      firstName: data.farmers.users.firstName,
+      lastName: data.farmers.users.lastName
     };
   }
 
@@ -275,13 +275,13 @@ class SupabaseDatabase {
 
   async getOrdersByUserId(userId, role) {
     let query;
-    
+
     if (role === 'farmer') {
       query = this.supabase
         .from('orders')
         .select(`
           *,
-          users!orders_buyer_id_fkey(first_name, last_name)
+          users!orders_buyer_id_fkey(firstName, lastName)
         `)
         .eq('farmer_id', userId);
     } else {
@@ -300,8 +300,8 @@ class SupabaseDatabase {
 
     return data.map(order => ({
       ...order,
-      buyerFirstName: order.users?.first_name,
-      buyerLastName: order.users?.last_name,
+      buyerFirstName: order.users?.firstName,
+      buyerLastName: order.users?.lastName,
       farmName: order.farmers?.farm_name
     }));
   }
@@ -322,7 +322,7 @@ class SupabaseDatabase {
   async updateOrderStatus(orderId, status) {
     const { error } = await this.supabase
       .from('orders')
-      .update({ 
+      .update({
         status,
         updated_at: new Date().toISOString()
       })
@@ -353,38 +353,209 @@ class SupabaseDatabase {
       .select('*')
       .eq('buyer_id', buyerId)
       .eq('farmer_id', farmerId)
-      .single();
+      .limit(1)
+      .maybeSingle();  // ✅ safer than `.single()`
 
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error) {
+      console.error('❌ Error in getChatByUsers:', error);
+      throw error;
+    }
+
     return data;
   }
 
+
   async createMessage(messageData) {
-    const { data, error } = await this.supabase
+    console.log('🛠️ Creating message with data:', messageData);
+
+    // 1. Get chat participants
+    const { data: chat, error: chatError } = await this.supabase
+      .from('chats')
+      .select('buyer_id, farmer_id')
+      .eq('id', messageData.chatId)
+      .single();
+
+    if (chatError) {
+      console.error('❌ Error fetching chat participants:', chatError);
+      throw chatError;
+    }
+
+    console.log('👥 Chat participants:', chat);
+
+    // 2. Determine receiver_id properly
+    let receiver_id;
+
+    if (messageData.senderId === chat.buyer_id) {
+      // Sender is buyer → resolve farmer's user_id
+      const { data: farmer, error: farmerError } = await this.supabase
+        .from('farmers')
+        .select('user_id')
+        .eq('id', chat.farmer_id)
+        .single();
+
+      if (farmerError) {
+        console.error('❌ Failed to fetch farmer user_id:', farmerError);
+        throw farmerError;
+      }
+
+      receiver_id = farmer.user_id;
+    } else {
+      // Sender is farmer → receiver is buyer
+      receiver_id = chat.buyer_id;
+    }
+
+    console.log('🎯 Resolved receiver_id:', receiver_id);
+
+    // 3. Insert message
+    const { data: message, error: messageError } = await this.supabase
       .from('messages')
       .insert({
         chat_id: messageData.chatId,
         sender_id: messageData.senderId,
+        receiver_id,
         content: messageData.content,
-        type: messageData.type || 'text'
+        type: messageData.type || 'text',
+        is_read: false
       })
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
+    if (messageError) {
+      console.error('❌ Error inserting message:', messageError);
+      throw messageError;
+    }
+
+    console.log('✅ Message inserted:', message);
+
+    // 4. Update chat timestamp
+    const { error: updateError } = await this.supabase
+      .from('chats')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', messageData.chatId);
+
+    if (updateError) {
+      console.warn('⚠️ Failed to update chat updated_at:', updateError);
+    } else {
+      console.log('📅 Chat updated_at refreshed');
+    }
+
+    return message;
   }
 
+
   async getMessages(chatId) {
+    console.log("📥 Fetching messages for chat ID:", chatId);
+
     const { data, error } = await this.supabase
       .from('messages')
       .select('*')
       .eq('chat_id', chatId)
       .order('created_at', { ascending: true });
 
+    if (error) {
+      console.error("❌ Error fetching messages:", error);
+      throw error;
+    }
+
+    console.log(`📦 ${data.length} messages fetched`);
+    return data;
+  }
+
+
+
+async getChatsByUser(userId) {
+  console.log('📥 Fetching chats for user ID:', userId);
+
+  const { data, error } = await this.supabase
+    .from('chats')
+    .select(`
+      *,
+      messages (
+        id,
+        content,
+        sender_id,
+        receiver_id,
+        is_read,
+        created_at
+      ),
+      farmers (
+        farm_name,
+        user_id,
+        users (
+          firstName,
+          lastName,
+          avatar
+        )
+      )
+    `)
+    .or(`buyer_id.eq.${userId},farmer_id.eq.${userId}`)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ Error fetching chats:', error);
+    throw error;
+  }
+
+  console.log(`💬 ${data.length} chats fetched`);
+
+  const mappedChats = data.map(chat => {
+    const messages = chat.messages || [];
+    const lastMsg = messages[messages.length - 1];
+
+    const unreadCount = messages.filter(
+      m => m.receiver_id === userId && !m.is_read
+    ).length;
+
+    const farmerUser = chat.farmers?.users;
+
+    const farmerName = farmerUser
+      ? `${farmerUser.firstName} ${farmerUser.lastName}`
+      : chat.farmers?.farm_name || 'Farmer';
+
+    const avatar = farmerUser?.avatar || null;
+
+    return {
+      id: chat.id,
+      farmerId: chat.farmer_id,
+      farmerName,
+      avatar,
+      lastMessage: lastMsg?.content || '',
+      lastMessageTime: lastMsg?.created_at || chat.updated_at,
+      unreadCount
+    };
+  });
+
+  return mappedChats;
+}
+
+
+  async getAllUsers() {
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('*');
+
     if (error) throw error;
     return data;
   }
+
+
+  async getChatById(chatId) {
+    const { data, error } = await this.supabase
+      .from('chats')
+      .select('*')
+      .eq('id', chatId)
+      .single();
+
+    if (error) {
+      console.error('❌ Error in getChatById:', error);
+      throw error;
+    }
+
+    return data;
+  }
+
+
+
 
   // Admin methods
   async getAllUsers() {
@@ -412,7 +583,7 @@ class SupabaseDatabase {
       .from('orders')
       .select(`
         *,
-        users!orders_buyer_id_fkey(first_name, last_name),
+        users!orders_buyer_id_fkey(firstName, lastName),
         farmers!orders_farmer_id_fkey(farm_name)
       `)
       .order('created_at', { ascending: false });
@@ -421,8 +592,8 @@ class SupabaseDatabase {
 
     return data.map(order => ({
       ...order,
-      buyerFirstName: order.users.first_name,
-      buyerLastName: order.users.last_name,
+      buyerFirstName: order.users.firstName,
+      buyerLastName: order.users.lastName,
       farmName: order.farmers.farm_name
     }));
   }

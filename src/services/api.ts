@@ -42,7 +42,7 @@ export const authAPI = {
 
 // Products API
 export const productsAPI = {
-  getAll: (filters?: { category?: string; farmerId?: string }) => 
+  getAll: (filters?: { category?: string; farmerId?: string }) =>
     api.get('/products', { params: filters }),
   getById: (id: string) => api.get(`/products/${id}`),
   create: (productData: FormData) => api.post('/products', productData, {
@@ -68,9 +68,16 @@ export const ordersAPI = {
 // Chat API
 export const chatAPI = {
   createChat: (farmerId: string) => api.post('/chat/create', { farmerId }),
-  getMessages: (chatId: string) => api.get(`/chat/${chatId}/messages`),
-  sendMessage: (chatId: string, content: string, type: string = 'text') => 
+
+  // ✅ Use api instance here
+  getMessages: (chatId: string) => axios.get(`/chat/${chatId}/messages`).then(res => res.data),
+
+  sendMessage: (chatId: string, content: string, type: string = 'text') =>
     api.post(`/chat/${chatId}/messages`, { content, type }),
+
+  // ✅ Use api instance here too
+  getChatsByUser: (userId: string) => 
+    axios.get(`/chat/user/${userId}`).then(res => res.data),
 };
 
 // Admin API

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageCircle, Search, User, Clock } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { chatAPI } from '../../services/api';
+import io from 'socket.io-client';
 
 interface ChatHistoryProps {
   onSelectChat: (farmerId: string, farmerName: string) => void;
@@ -12,48 +13,59 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ onSelectChat }) => {
   const [chats, setChats] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [socket, setSocket] = useState<any>(null);
+
+  useEffect(() => {
+    const newSocket = io('http://localhost:3001');
+    setSocket(newSocket);
+    return () => {
+      newSocket.close();
+    };
+  }, []);
 
   useEffect(() => {
     loadChatHistory();
+    const interval = setInterval(loadChatHistory, 10000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadChatHistory = async () => {
-    try {
-      // For now, we'll simulate chat history
-      // In a real app, you'd have an API endpoint to get user's chat history
-      const mockChats = [
-        {
-          id: '1',
-          farmerId: 'farmer1',
-          farmerName: 'Green Acres Farm',
-          lastMessage: 'Thank you for your order! It will be delivered tomorrow.',
-          lastMessageTime: '2024-01-15T14:30:00Z',
-          unreadCount: 2,
-          avatar: null
-        },
-        {
-          id: '2',
-          farmerId: 'farmer2',
-          farmerName: 'Sunny Dale Organic',
-          lastMessage: 'The tomatoes are fresh and ready for pickup.',
-          lastMessageTime: '2024-01-14T10:15:00Z',
-          unreadCount: 0,
-          avatar: null
-        },
-        {
-          id: '3',
-          farmerId: 'farmer3',
-          farmerName: 'Valley Fresh Produce',
-          lastMessage: 'Hi! Are the apples still available?',
-          lastMessageTime: '2024-01-13T16:45:00Z',
-          unreadCount: 1,
-          avatar: null
-        }
-      ];
+  useEffect(() => {
+    if (!socket || !user?.id) return;
 
-      setChats(mockChats);
-    } catch (error) {
-      console.error('Failed to load chat history:', error);
+    const handleNewMessage = (message: any) => {
+      if (message?.senderId === user.id || message?.receiverId === user.id) {
+        loadChatHistory();
+      }
+    };
+
+    socket.on('new-message', handleNewMessage);
+    return () => {
+      socket.off('new-message', handleNewMessage);
+    };
+  }, [socket, user?.id]);
+
+  const loadChatHistory = async () => {
+    if (!user?.id) return;
+
+    try {
+      setIsLoading(true);
+      const raw = await chatAPI.getChatsByUser(user.id);
+
+      const data = Array.isArray(raw)
+        ? raw.map((chat: any) => ({
+            id: chat._id || chat.id,
+            farmerId: chat.farmer_id,
+            farmerName: chat.farmer_name || 'Unknown',
+            lastMessage: chat.last_message ?? '',
+            lastMessageTime: chat.updated_at || chat.created_at || new Date().toISOString(),
+            unreadCount: chat.unread_count || 0,
+            avatar: chat.avatar || null,
+          }))
+        : [];
+
+      setChats(data);
+    } catch {
+      setChats([]);
     } finally {
       setIsLoading(false);
     }
@@ -69,15 +81,10 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ onSelectChat }) => {
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-    if (diffInHours < 1) {
-      return 'Just now';
-    } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)}h ago`;
-    } else if (diffInHours < 48) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString();
-    }
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
+    if (diffInHours < 48) return 'Yesterday';
+    return date.toLocaleDateString();
   };
 
   if (isLoading) {
@@ -90,14 +97,11 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ onSelectChat }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border">
-      {/* Header */}
       <div className="p-4 border-b">
         <h2 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
           <MessageCircle className="h-5 w-5" />
           <span>Messages</span>
         </h2>
-        
-        {/* Search */}
         <div className="mt-4 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
@@ -110,7 +114,6 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ onSelectChat }) => {
         </div>
       </div>
 
-      {/* Chat List */}
       <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
         {filteredChats.length > 0 ? (
           filteredChats.map((chat) => (
@@ -133,7 +136,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ onSelectChat }) => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-gray-900 truncate">
@@ -161,18 +164,20 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ onSelectChat }) => {
         ) : (
           <div className="p-8 text-center">
             {searchQuery ? (
-              <div>
+              <>
                 <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No conversations found matching "{searchQuery}"</p>
-              </div>
+                <p className="text-gray-500">
+                  No conversations found matching "{searchQuery}"
+                </p>
+              </>
             ) : (
-              <div>
+              <>
                 <MessageCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">No conversations yet</p>
                 <p className="text-sm text-gray-400 mt-2">
                   Start chatting with farmers by clicking the chat button on any product
                 </p>
-              </div>
+              </>
             )}
           </div>
         )}
