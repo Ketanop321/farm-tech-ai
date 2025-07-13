@@ -4,7 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import authenticateToken from '../middleware/authmiddleware.js'
+import authenticateToken from '../middleware/authmiddleware.js';
 
 // ES module equivalents for __dirname and __filename
 const __filename = fileURLToPath(import.meta.url);
@@ -25,14 +25,14 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
     
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
     }
   }
 });
@@ -56,7 +56,13 @@ export default (db, JWT_SECRET) => {
   // Get product by ID
   router.get('/:id', async (req, res) => {
     try {
-      const product = await db.getProductById(req.params.id);
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ error: 'Product ID is required' });
+      }
+
+      const product = await db.getProductById(id);
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
@@ -76,6 +82,11 @@ export default (db, JWT_SECRET) => {
 
       const { title, description, category, price, stock, unit } = req.body;
       
+      // Validate required fields
+      if (!title || !category || !price || !stock || !unit) {
+        return res.status(400).json({ error: 'Missing required fields: title, category, price, stock, unit' });
+      }
+
       // Get farmer info
       const farmer = await db.getFarmerByUserId(req.user.userId);
       if (!farmer) {
@@ -90,7 +101,7 @@ export default (db, JWT_SECRET) => {
         id: productId,
         farmerId: farmer.id,
         title,
-        description,
+        description: description || '',
         category,
         price: parseFloat(price),
         stock: parseInt(stock),
@@ -112,7 +123,13 @@ export default (db, JWT_SECRET) => {
         return res.status(403).json({ error: 'Only farmers can update products' });
       }
 
-      const product = await db.getProductById(req.params.id);
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ error: 'Product ID is required' });
+      }
+
+      const product = await db.getProductById(id);
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
@@ -127,7 +144,7 @@ export default (db, JWT_SECRET) => {
       const { title, description, category, price, stock, unit } = req.body;
 
       if (title) updates.title = title;
-      if (description) updates.description = description;
+      if (description !== undefined) updates.description = description;
       if (category) updates.category = category;
       if (price) updates.price = parseFloat(price);
       if (stock) updates.stock = parseInt(stock);
@@ -138,9 +155,9 @@ export default (db, JWT_SECRET) => {
         updates.images = JSON.stringify(req.files.map(file => `/uploads/${file.filename}`));
       }
 
-      await db.updateProduct(req.params.id, updates);
+      await db.updateProduct(id, updates);
       
-      const updatedProduct = await db.getProductById(req.params.id);
+      const updatedProduct = await db.getProductById(id);
       res.json(updatedProduct);
     } catch (error) {
       console.error('Update product error:', error);

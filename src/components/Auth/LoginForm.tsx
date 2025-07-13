@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 interface LoginFormProps {
@@ -10,22 +10,37 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const { login } = useAuth();
+  const { login, isLoading, error } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
+    
+    if (!email || !password) {
+      return;
+    }
 
     try {
       await login(email, password);
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      // Error is handled by useAuth hook
+      console.error('Login failed:', error);
+    }
+  };
+
+  const fillDemoCredentials = (type: 'admin' | 'farmer' | 'buyer') => {
+    switch (type) {
+      case 'admin':
+        setEmail('admin@farmmarket.com');
+        setPassword('admin123');
+        break;
+      case 'farmer':
+        setEmail('farmer3@example.com');
+        setPassword('Pass789!');
+        break;
+      case 'buyer':
+        setEmail('buyer3@example.com');
+        setPassword('market789!');
+        break;
     }
   };
 
@@ -37,8 +52,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded flex items-center">
+          <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+          <span className="text-sm">{error}</span>
         </div>
       )}
 
@@ -55,8 +71,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               placeholder="Enter your email"
+              disabled={isLoading}
             />
           </div>
         </div>
@@ -73,13 +90,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               placeholder="Enter your password"
+              disabled={isLoading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              disabled={isLoading}
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -88,8 +107,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
 
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+          disabled={isLoading || !email || !password}
+          className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Signing In...' : 'Sign In'}
         </button>
@@ -101,6 +120,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
           <button
             onClick={onToggleForm}
             className="text-green-600 hover:text-green-700 font-medium"
+            disabled={isLoading}
           >
             Sign up
           </button>
@@ -108,10 +128,33 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
         
         <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
           <p className="font-medium text-blue-800 mb-2">Demo Credentials:</p>
-          <p className="text-blue-700">Farmer: farmer3@example.com / Pass789!</p>
-          <p className="text-blue-700">Buyer: buyer3@example.com / market789!</p>
-          <p className="text-blue-700">Admin: admin@farmmarket.com / admin123</p>
-          <p className="text-blue-700">Or register as farmer/buyer</p>
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => fillDemoCredentials('admin')}
+              className="block w-full text-left text-blue-700 hover:text-blue-900 hover:bg-blue-100 px-2 py-1 rounded"
+              disabled={isLoading}
+            >
+              Admin: admin@farmmarket.com / admin123
+            </button>
+            <button
+              type="button"
+              onClick={() => fillDemoCredentials('farmer')}
+              className="block w-full text-left text-blue-700 hover:text-blue-900 hover:bg-blue-100 px-2 py-1 rounded"
+              disabled={isLoading}
+            >
+              Farmer: farmer3@example.com / Pass789!
+            </button>
+            <button
+              type="button"
+              onClick={() => fillDemoCredentials('buyer')}
+              className="block w-full text-left text-blue-700 hover:text-blue-900 hover:bg-blue-100 px-2 py-1 rounded"
+              disabled={isLoading}
+            >
+              Buyer: buyer3@example.com / market789!
+            </button>
+          </div>
+          <p className="text-blue-700 mt-2">Click any credential to auto-fill, or register as farmer/buyer</p>
         </div>
       </div>
     </div>

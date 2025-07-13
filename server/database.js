@@ -8,11 +8,20 @@ const db = verbose();
 
 class Database {
   constructor() {
-    this.db = new db.Database('marketplace.db');
+    this.db = new db.Database('marketplace.db', (err) => {
+      if (err) {
+        console.error('Error opening database:', err);
+      } else {
+        console.log('Connected to SQLite database');
+      }
+    });
     this.init();
   }
 
   init() {
+    // Enable foreign keys
+    this.db.run('PRAGMA foreign_keys = ON');
+
     // Users table
     this.db.run(`
       CREATE TABLE IF NOT EXISTS users (
@@ -41,7 +50,7 @@ class Database {
         kycDocuments TEXT,
         isApproved BOOLEAN DEFAULT 0,
         accountBalance REAL DEFAULT 0,
-        FOREIGN KEY (userId) REFERENCES users (id)
+        FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
       )
     `);
 
@@ -72,7 +81,7 @@ class Database {
         isActive BOOLEAN DEFAULT 1,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (farmerId) REFERENCES farmers (id)
+        FOREIGN KEY (farmerId) REFERENCES farmers (id) ON DELETE CASCADE
       )
     `);
 
@@ -90,8 +99,8 @@ class Database {
         paymentId TEXT,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (buyerId) REFERENCES users (id),
-        FOREIGN KEY (farmerId) REFERENCES farmers (id)
+        FOREIGN KEY (buyerId) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (farmerId) REFERENCES farmers (id) ON DELETE CASCADE
       )
     `);
 
@@ -103,8 +112,8 @@ class Database {
         productId TEXT NOT NULL,
         quantity INTEGER NOT NULL,
         price REAL NOT NULL,
-        FOREIGN KEY (orderId) REFERENCES orders (id),
-        FOREIGN KEY (productId) REFERENCES products (id)
+        FOREIGN KEY (orderId) REFERENCES orders (id) ON DELETE CASCADE,
+        FOREIGN KEY (productId) REFERENCES products (id) ON DELETE CASCADE
       )
     `);
 
@@ -116,8 +125,9 @@ class Database {
         farmerId TEXT NOT NULL,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (buyerId) REFERENCES users (id),
-        FOREIGN KEY (farmerId) REFERENCES farmers (id)
+        UNIQUE(buyerId, farmerId),
+        FOREIGN KEY (buyerId) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (farmerId) REFERENCES farmers (id) ON DELETE CASCADE
       )
     `);
 
@@ -131,8 +141,8 @@ class Database {
         type TEXT NOT NULL DEFAULT 'text',
         isRead BOOLEAN DEFAULT 0,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (chatId) REFERENCES chats (id),
-        FOREIGN KEY (senderId) REFERENCES users (id)
+        FOREIGN KEY (chatId) REFERENCES chats (id) ON DELETE CASCADE,
+        FOREIGN KEY (senderId) REFERENCES users (id) ON DELETE CASCADE
       )
     `);
 
@@ -147,18 +157,19 @@ class Database {
         rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
         comment TEXT,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (orderId) REFERENCES orders (id),
-        FOREIGN KEY (buyerId) REFERENCES users (id),
-        FOREIGN KEY (farmerId) REFERENCES farmers (id),
-        FOREIGN KEY (productId) REFERENCES products (id)
+        FOREIGN KEY (orderId) REFERENCES orders (id) ON DELETE CASCADE,
+        FOREIGN KEY (buyerId) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (farmerId) REFERENCES farmers (id) ON DELETE CASCADE,
+        FOREIGN KEY (productId) REFERENCES products (id) ON DELETE CASCADE
       )
     `);
 
-    // Insert default categories
-    this.insertDefaultCategories();
-    
-    // Insert admin user
-    this.insertAdminUser();
+    // Insert default data after tables are created
+    setTimeout(() => {
+      this.insertDefaultCategories();
+      this.insertAdminUser();
+      this.insertDemoUsers();
+    }, 1000);
   }
 
   insertDefaultCategories() {
@@ -173,21 +184,92 @@ class Database {
     categories.forEach(category => {
       this.db.run(
         'INSERT OR IGNORE INTO categories (id, name, description) VALUES (?, ?, ?)',
-        [category.id, category.name, category.description]
+        [category.id, category.name, category.description],
+        (err) => {
+          if (err) {
+            console.error('Error inserting category:', err);
+          }
+        }
       );
     });
   }
 
   async insertAdminUser() {
-    const adminExists = await this.getUserByEmail('admin@farmmarket.com');
-    if (!adminExists) {
-      const hashedPassword = await bcrypt.hash('admin123', 10);
-      const adminId = uuidv4();
-      
-      this.db.run(
-        'INSERT INTO users (id, email, password, firstName, lastName, role, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [adminId, 'admin@farmmarket.com', hashedPassword, 'Admin', 'User', 'admin', 1]
-      );
+    try {
+      const adminExists = await this.getUserByEmail('admin@farmmarket.com');
+      if (!adminExists) {
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const adminId = uuidv4();
+        
+        this.db.run(
+          'INSERT INTO users (id, email, password, firstName, lastName, role, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [adminId, 'admin@farmmarket.com', hashedPassword, 'Admin', 'User', 'admin', 1],
+          (err) => {
+            if (err) {
+              console.error('Error creating admin user:', err);
+            } else {
+              console.log('Admin user created successfully');
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error checking/creating admin user:', error);
+    }
+  }
+
+  async insertDemoUsers() {
+    try {
+      // Demo farmer
+      const farmerExists = await this.getUserByEmail('farmer3@example.com');
+      if (!farmerExists) {
+        const hashedPassword = await bcrypt.hash('Pass789!', 10);
+        const farmerId = uuidv4();
+        const farmerUserId = uuidv4();
+        
+        this.db.run(
+          'INSERT INTO users (id, email, password, firstName, lastName, phone, role, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [farmerUserId, 'farmer3@example.com', hashedPassword, 'Demo', 'Farmer', '+1234567890', 'farmer', 1],
+          (err) => {
+            if (!err) {
+              this.db.run(
+                'INSERT INTO farmers (id, userId, farmName, farmAddress, licenseNumber, isApproved) VALUES (?, ?, ?, ?, ?, ?)',
+                [farmerId, farmerUserId, 'Demo Farm', '123 Farm Road, Demo City', 'LIC123456', 1],
+                (err) => {
+                  if (err) {
+                    console.error('Error creating demo farmer profile:', err);
+                  } else {
+                    console.log('Demo farmer created successfully');
+                  }
+                }
+              );
+            } else {
+              console.error('Error creating demo farmer user:', err);
+            }
+          }
+        );
+      }
+
+      // Demo buyer
+      const buyerExists = await this.getUserByEmail('buyer3@example.com');
+      if (!buyerExists) {
+        const hashedPassword = await bcrypt.hash('market789!', 10);
+        const buyerUserId = uuidv4();
+        
+        this.db.run(
+          'INSERT INTO users (id, email, password, firstName, lastName, phone, role, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [buyerUserId, 'buyer3@example.com', hashedPassword, 'Demo', 'Buyer', '+1234567891', 'buyer', 1],
+          (err) => {
+            if (err) {
+              console.error('Error creating demo buyer:', err);
+            } else {
+              console.log('Demo buyer created successfully');
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error creating demo users:', error);
     }
   }
 
@@ -196,11 +278,16 @@ class Database {
     return new Promise((resolve, reject) => {
       const { id, email, password, firstName, lastName, phone, role } = userData;
       this.db.run(
-        'INSERT INTO users (id, email, password, firstName, lastName, phone, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [id, email, password, firstName, lastName, phone, role],
+        'INSERT INTO users (id, email, password, firstName, lastName, phone, role, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, email, password, firstName, lastName, phone, role, 1],
         function(err) {
-          if (err) reject(err);
-          else resolve({ id, email, firstName, lastName, phone, role });
+          if (err) {
+            console.error('Database error creating user:', err);
+            reject(err);
+          } else {
+            console.log('User created successfully:', email);
+            resolve({ id, email, firstName, lastName, phone, role });
+          }
         }
       );
     });
@@ -209,8 +296,12 @@ class Database {
   getUserByEmail(email) {
     return new Promise((resolve, reject) => {
       this.db.get('SELECT * FROM users WHERE email = ?', [email], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
+        if (err) {
+          console.error('Database error getting user by email:', err);
+          reject(err);
+        } else {
+          resolve(row);
+        }
       });
     });
   }
@@ -218,8 +309,12 @@ class Database {
   getUserById(id) {
     return new Promise((resolve, reject) => {
       this.db.get('SELECT * FROM users WHERE id = ?', [id], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
+        if (err) {
+          console.error('Database error getting user by id:', err);
+          reject(err);
+        } else {
+          resolve(row);
+        }
       });
     });
   }
@@ -229,11 +324,16 @@ class Database {
     return new Promise((resolve, reject) => {
       const { id, userId, farmName, farmAddress, licenseNumber } = farmerData;
       this.db.run(
-        'INSERT INTO farmers (id, userId, farmName, farmAddress, licenseNumber) VALUES (?, ?, ?, ?, ?)',
-        [id, userId, farmName, farmAddress, licenseNumber],
+        'INSERT INTO farmers (id, userId, farmName, farmAddress, licenseNumber, isApproved) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, userId, farmName, farmAddress, licenseNumber, 0],
         function(err) {
-          if (err) reject(err);
-          else resolve({ id, userId, farmName, farmAddress, licenseNumber });
+          if (err) {
+            console.error('Database error creating farmer:', err);
+            reject(err);
+          } else {
+            console.log('Farmer profile created successfully');
+            resolve({ id, userId, farmName, farmAddress, licenseNumber });
+          }
         }
       );
     });
@@ -242,8 +342,12 @@ class Database {
   getFarmerByUserId(userId) {
     return new Promise((resolve, reject) => {
       this.db.get('SELECT * FROM farmers WHERE userId = ?', [userId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
+        if (err) {
+          console.error('Database error getting farmer by userId:', err);
+          reject(err);
+        } else {
+          resolve(row);
+        }
       });
     });
   }
@@ -256,8 +360,13 @@ class Database {
         'INSERT INTO products (id, farmerId, title, description, category, price, stock, images, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [id, farmerId, title, description, category, price, stock, JSON.stringify(images), unit],
         function(err) {
-          if (err) reject(err);
-          else resolve({ id, farmerId, title, description, category, price, stock, images, unit });
+          if (err) {
+            console.error('Database error creating product:', err);
+            reject(err);
+          } else {
+            console.log('Product created successfully');
+            resolve({ id, farmerId, title, description, category, price, stock, images, unit });
+          }
         }
       );
     });
@@ -287,8 +396,10 @@ class Database {
       query += ' ORDER BY p.createdAt DESC';
 
       this.db.all(query, params, (err, rows) => {
-        if (err) reject(err);
-        else {
+        if (err) {
+          console.error('Database error getting products:', err);
+          reject(err);
+        } else {
           const products = rows.map(row => ({
             ...row,
             farmerId: row.farmerId,
@@ -310,8 +421,10 @@ class Database {
          WHERE p.id = ?`,
         [id],
         (err, row) => {
-          if (err) reject(err);
-          else {
+          if (err) {
+            console.error('Database error getting product by id:', err);
+            reject(err);
+          } else {
             if (row) {
               row.images = JSON.parse(row.images || '[]');
               row.farmerId = row.farmerId;
@@ -333,8 +446,13 @@ class Database {
         `UPDATE products SET ${fields}, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
         values,
         function(err) {
-          if (err) reject(err);
-          else resolve(this.changes);
+          if (err) {
+            console.error('Database error updating product:', err);
+            reject(err);
+          } else {
+            console.log('Product updated successfully');
+            resolve(this.changes);
+          }
         }
       );
     });
@@ -348,8 +466,13 @@ class Database {
         'INSERT INTO orders (id, buyerId, farmerId, totalAmount, shippingAddress, paymentMethod) VALUES (?, ?, ?, ?, ?, ?)',
         [id, buyerId, farmerId, totalAmount, JSON.stringify(shippingAddress), paymentMethod],
         function(err) {
-          if (err) reject(err);
-          else resolve({ id, buyerId, farmerId, totalAmount, shippingAddress, paymentMethod });
+          if (err) {
+            console.error('Database error creating order:', err);
+            reject(err);
+          } else {
+            console.log('Order created successfully');
+            resolve({ id, buyerId, farmerId, totalAmount, shippingAddress, paymentMethod });
+          }
         }
       );
     });
@@ -362,8 +485,12 @@ class Database {
         'INSERT INTO order_items (id, orderId, productId, quantity, price) VALUES (?, ?, ?, ?, ?)',
         [id, orderId, productId, quantity, price],
         function(err) {
-          if (err) reject(err);
-          else resolve({ id, orderId, productId, quantity, price });
+          if (err) {
+            console.error('Database error creating order item:', err);
+            reject(err);
+          } else {
+            resolve({ id, orderId, productId, quantity, price });
+          }
         }
       );
     });
@@ -392,8 +519,10 @@ class Database {
       }
 
       this.db.all(query, [userId], (err, rows) => {
-        if (err) reject(err);
-        else {
+        if (err) {
+          console.error('Database error getting orders:', err);
+          reject(err);
+        } else {
           const orders = rows.map(row => ({
             ...row,
             shippingAddress: JSON.parse(row.shippingAddress)
@@ -413,8 +542,10 @@ class Database {
          WHERE oi.orderId = ?`,
         [orderId],
         (err, rows) => {
-          if (err) reject(err);
-          else {
+          if (err) {
+            console.error('Database error getting order items:', err);
+            reject(err);
+          } else {
             const items = rows.map(row => ({
               ...row,
               images: JSON.parse(row.images || '[]')
@@ -432,8 +563,13 @@ class Database {
         'UPDATE orders SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?',
         [status, orderId],
         function(err) {
-          if (err) reject(err);
-          else resolve(this.changes);
+          if (err) {
+            console.error('Database error updating order status:', err);
+            reject(err);
+          } else {
+            console.log('Order status updated successfully');
+            resolve(this.changes);
+          }
         }
       );
     });
@@ -444,11 +580,15 @@ class Database {
     return new Promise((resolve, reject) => {
       const { id, buyerId, farmerId } = chatData;
       this.db.run(
-        'INSERT INTO chats (id, buyerId, farmerId) VALUES (?, ?, ?)',
+        'INSERT OR IGNORE INTO chats (id, buyerId, farmerId) VALUES (?, ?, ?)',
         [id, buyerId, farmerId],
         function(err) {
-          if (err) reject(err);
-          else resolve({ id, buyerId, farmerId });
+          if (err) {
+            console.error('Database error creating chat:', err);
+            reject(err);
+          } else {
+            resolve({ id, buyerId, farmerId });
+          }
         }
       );
     });
@@ -460,8 +600,12 @@ class Database {
         'SELECT * FROM chats WHERE buyerId = ? AND farmerId = ?',
         [buyerId, farmerId],
         (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
+          if (err) {
+            console.error('Database error getting chat:', err);
+            reject(err);
+          } else {
+            resolve(row);
+          }
         }
       );
     });
@@ -474,8 +618,12 @@ class Database {
         'INSERT INTO messages (id, chatId, senderId, content, type) VALUES (?, ?, ?, ?, ?)',
         [id, chatId, senderId, content, type],
         function(err) {
-          if (err) reject(err);
-          else resolve({ id, chatId, senderId, content, type, createdAt: new Date().toISOString() });
+          if (err) {
+            console.error('Database error creating message:', err);
+            reject(err);
+          } else {
+            resolve({ id, chatId, senderId, content, type, createdAt: new Date().toISOString() });
+          }
         }
       );
     });
@@ -487,8 +635,12 @@ class Database {
         'SELECT * FROM messages WHERE chatId = ? ORDER BY createdAt ASC',
         [chatId],
         (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
+          if (err) {
+            console.error('Database error getting messages:', err);
+            reject(err);
+          } else {
+            resolve(rows);
+          }
         }
       );
     });
@@ -498,8 +650,12 @@ class Database {
   getAllUsers() {
     return new Promise((resolve, reject) => {
       this.db.all('SELECT * FROM users ORDER BY createdAt DESC', (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
+        if (err) {
+          console.error('Database error getting all users:', err);
+          reject(err);
+        } else {
+          resolve(rows);
+        }
       });
     });
   }
@@ -513,8 +669,10 @@ class Database {
          JOIN farmers f ON o.farmerId = f.id
          ORDER BY o.createdAt DESC`,
         (err, rows) => {
-          if (err) reject(err);
-          else {
+          if (err) {
+            console.error('Database error getting all orders:', err);
+            reject(err);
+          } else {
             const orders = rows.map(row => ({
               ...row,
               shippingAddress: JSON.parse(row.shippingAddress)
@@ -532,8 +690,13 @@ class Database {
         'UPDATE farmers SET isApproved = 1 WHERE id = ?',
         [farmerId],
         function(err) {
-          if (err) reject(err);
-          else resolve(this.changes);
+          if (err) {
+            console.error('Database error approving farmer:', err);
+            reject(err);
+          } else {
+            console.log('Farmer approved successfully');
+            resolve(this.changes);
+          }
         }
       );
     });
@@ -542,8 +705,12 @@ class Database {
   getCategories() {
     return new Promise((resolve, reject) => {
       this.db.all('SELECT * FROM categories WHERE isActive = 1', (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
+        if (err) {
+          console.error('Database error getting categories:', err);
+          reject(err);
+        } else {
+          resolve(rows);
+        }
       });
     });
   }
