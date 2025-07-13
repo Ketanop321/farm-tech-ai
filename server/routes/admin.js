@@ -85,17 +85,7 @@ export default async (db, JWT_SECRET) => {
   router.patch('/farmers/:id/approve', authMiddleware, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      
-      if (!id) {
-        return res.status(400).json({ error: 'Farmer ID is required' });
-      }
-
-      const result = await db.approveFarmer(id);
-      
-      if (result === 0) {
-        return res.status(404).json({ error: 'Farmer not found' });
-      }
-
+      await db.approveFarmer(id);
       res.json({ message: 'Farmer approved successfully' });
     } catch (error) {
       console.error('Approve farmer error:', error);
