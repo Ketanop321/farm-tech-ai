@@ -1,8 +1,7 @@
- 
- [Ketan kumar (1).pdf](https://github.com/user-attachments/files/22057954/Ketan.kumar.1.pdf)
+ ![Ketan kumar (1)_page-0001](https://github.com/user-attachments/assets/40d0127b-136f-42b8-9cf2-ca79d1a203cc)
 
  
- 
+
  # 🌾 FarmMarket - Comprehensive Farmer Marketplace
 
 A full-stack multivendor marketplace platform connecting farmers directly with buyers, featuring real-time chat, order management, and comprehensive admin oversight.
