@@ -2,6 +2,8 @@
 
  
 
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
  # 🌾 FarmMarket - Comprehensive Farmer Marketplace
 
 A full-stack multivendor marketplace platform connecting farmers directly with buyers, featuring real-time chat, order management, and comprehensive admin oversight.
